@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Degradado de fondo -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e1b4b" />
+    </linearGradient>
+
+    <!-- Degradado del tejado -->
+    <linearGradient id="roofGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#10b981" />
+    </linearGradient>
+
+    <!-- Resplandor central -->
+    <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <!-- Fondo Squircle redondeado para icono moderno de App -->
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="url(#bgGrad)" />
+  <rect x="2" y="2" width="508" height="508" rx="110" fill="none" stroke="#6366f1" stroke-width="6" stroke-opacity="0.35" />
+
+  <!-- Resplandor -->
+  <circle cx="256" cy="256" r="180" fill="url(#glowGrad)" />
+
+  <!-- Chimenea -->
+  <rect x="320" y="140" width="40" height="75" rx="6" fill="#ec4899" />
+
+  <!-- Tejado con frontón dinámico -->
+  <polygon points="256,128 92,270 420,270" fill="url(#roofGrad)" />
+
+  <!-- Cuerpo de la casa (Blanco puro con sombra sutil) -->
+  <rect x="138" y="266" width="236" height="154" rx="12" fill="#ffffff" />
+
+  <!-- Puerta en arco cálida -->
+  <path d="M 221,420 L 221,348 A 35,35 0 0,1 291,348 L 291,420 Z" fill="#ea580c" />
+
+  <!-- Corazón de Ismael & Sandra en el centro del frontón -->
+  <path d="M 256,224 C 256,224 232,192 232,176 A 16,16 0 0,1 256,164 A 16,16 0 0,1 280,176 C 280,192 256,224 256,224 Z" fill="#f43f5e" />
+</svg>
