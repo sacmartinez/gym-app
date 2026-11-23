@@ -570,8 +570,11 @@ Devuelve EXCLUSIVAMENTE un objeto JSON válido con esta estructura:
 
 // Enrutado SPA: cualquier otra ruta entrega index.html en producción
 if (fs.existsSync(distPath)) {
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(distPath, 'index.html'));
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && !req.path.startsWith('/api')) {
+      return res.sendFile(path.join(distPath, 'index.html'));
+    }
+    next();
   });
 }
 
