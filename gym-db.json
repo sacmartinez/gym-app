@@ -1,0 +1,194 @@
+{
+  "gymUsers": [
+    {
+      "name": "Ismael",
+      "phone": "684093483",
+      "password": "280894",
+      "onboarded": true,
+      "updatedAt": "2026-11-24T11:37:39.524Z"
+    },
+    {
+      "name": "Sandra",
+      "phone": "",
+      "password": "",
+      "onboarded": false
+    }
+  ],
+  "gymWorkouts": [
+    {
+      "id": "1795522404794-4596",
+      "user": "Ismael",
+      "type": "gym",
+      "routineId": null,
+      "date": "2026-11-24",
+      "routineName": "Entrenamiento en Gimnasio Marbella",
+      "category": "General",
+      "durationMin": 45,
+      "caloriesBurned": 300,
+      "totalVolumeKg": 0,
+      "feeling": "💪 Muy bien",
+      "notes": "",
+      "exercises": [],
+      "createdAt": "2026-11-24T12:13:24.794Z"
+    },
+    {
+      "id": "seed-gym-ismael-2026-11-23",
+      "user": "Ismael",
+      "type": "gym",
+      "routineId": "dia-1",
+      "date": "2026-11-23",
+      "routineName": "🔥💪 Día 1: Pecho, Espalda, Bombeo de Brazos + Tableta + Cardio",
+      "category": "Gimnasio Marbella",
+      "durationMin": 55,
+      "caloriesBurned": 367,
+      "totalVolumeKg": 4860,
+      "feeling": "💪 Muy bien",
+      "notes": "Sesión completada en Gimnasio Marbella + Cardio 20:43 (3.28 Km · 115.2 kcal · Nivel 6)",
+      "exercises": [
+        {
+          "name": "Press de Pecho Sentado",
+          "machine": "Máquina de Pecho",
+          "sets": 4,
+          "reps": "12",
+          "weightKg": 30,
+          "isCardio": false,
+          "nextAction": "mejorar",
+          "completed": true,
+          "setDetails": []
+        },
+        {
+          "name": "Jalón al Pecho en Polea Alta",
+          "machine": "Polea Alta (Espalda en V)",
+          "sets": 4,
+          "reps": "12",
+          "weightKg": 35,
+          "isCardio": false,
+          "nextAction": "mejorar",
+          "completed": true,
+          "setDetails": []
+        },
+        {
+          "name": "Curl de Bíceps en Polea Baja o Mancuernas",
+          "machine": "Polea Baja / Mancuernas",
+          "sets": 4,
+          "reps": "12",
+          "weightKg": 12,
+          "isCardio": false,
+          "nextAction": "mejorar",
+          "completed": true,
+          "setDetails": []
+        },
+        {
+          "name": "Extensión de Tríceps con Cuerda en Polea",
+          "machine": "Estación de Poleas",
+          "sets": 4,
+          "reps": "12",
+          "weightKg": 17.5,
+          "isCardio": false,
+          "nextAction": "mejorar",
+          "completed": true,
+          "setDetails": []
+        },
+        {
+          "name": "Crunch Abdominal con Peso en Polea / Máquina",
+          "machine": "Polea Alta / Máquina Abs",
+          "sets": 4,
+          "reps": "15",
+          "weightKg": 25,
+          "isCardio": false,
+          "nextAction": "mejorar",
+          "completed": true,
+          "setDetails": []
+        },
+        {
+          "name": "Plancha Abdominal Dura (Core de Acero)",
+          "machine": "Zona Colchonetas",
+          "sets": 3,
+          "reps": "45 seg",
+          "weightKg": 0,
+          "isCardio": true,
+          "nextAction": "mejorar",
+          "completed": true,
+          "setDetails": []
+        },
+        {
+          "name": "Cardio Quema-Grasa (Elíptica / Cinta / Bici)",
+          "machine": "Zona Cardio (Pantalla)",
+          "sets": 1,
+          "reps": "20:43",
+          "weightKg": 0,
+          "isCardio": true,
+          "distanceKm": 3.28,
+          "caloriesKcal": 115.2,
+          "levelMax": 6,
+          "avgPulse": 107,
+          "avgRpm": 40,
+          "nextAction": "mejorar",
+          "completed": true,
+          "setDetails": []
+        }
+      ],
+      "createdAt": "2026-11-23T09:56:40.547Z"
+    }
+  ],
+  "gymBodyWeights": [
+    {
+      "id": "1795520267821-2387",
+      "user": "Ismael",
+      "date": "2026-11-24",
+      "weightKg": 78,
+      "note": "",
+      "createdAt": "2026-11-24T11:37:47.821Z"
+    },
+    {
+      "id": "1795518198556-5685",
+      "user": "Ismael",
+      "date": "2026-11-24",
+      "weightKg": 78,
+      "note": "",
+      "createdAt": "2026-11-24T11:03:18.556Z"
+    }
+  ],
+  "gymGoals": {
+    "Ismael": {
+      "targetDaysPerWeek": 4,
+      "targetWeightKg": 70,
+      "goalType": "definicion_grasa",
+      "goalLabel": "🔥💪🍫 Definición & Pérdida de Grasa",
+      "customFocus": "Quemar grasa corporal acumulada, definir cintura y congestionar brazos, hombros y abdomen.",
+      "level": "Duro / Progresivo"
+    },
+    "Sandra": {
+      "targetDaysPerWeek": 3,
+      "targetWeightKg": null,
+      "goalType": "tonificar",
+      "goalLabel": "⚡ Tonificar y Ponerse en Forma",
+      "customFocus": "",
+      "level": "Adaptación / Progresivo"
+    }
+  },
+  "gymCustomRoutines": [],
+  "gymCoopSession": null,
+  "gymMeals": [],
+  "gymWaterLogs": {},
+  "gymInProgress": {},
+  "geminiApiKey": "",
+  "gymSeededDynamicV2": true,
+  "gymSubscriptions": {
+    "Ismael": {
+      "planId": "zeus",
+      "planName": "Plan Zeus · Olimpo VIP",
+      "price": 5,
+      "activatedAt": "2026-11-24T11:03:31.744Z"
+    }
+  },
+  "gymNfcCards": {
+    "Ismael": {
+      "cardId": "04:A2:3B:F1:89",
+      "label": "Torno Entrada",
+      "cardType": "Mifare / NFC Tag",
+      "color": "#005b99",
+      "updatedAt": "2026-11-24T11:34:03.973Z"
+    }
+  }
+}

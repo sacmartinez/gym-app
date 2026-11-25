@@ -7,6 +7,20 @@ const __dirname = path.dirname(__filename);
 const DB_PATH = path.join(__dirname, 'gym-db.json');
 
 const defaultData = {
+  gymUsers: [
+    {
+      name: 'Ismael',
+      phone: '',
+      password: '',
+      onboarded: false
+    },
+    {
+      name: 'Sandra',
+      phone: '',
+      password: '',
+      onboarded: false
+    }
+  ],
   gymWorkouts: [],
   gymBodyWeights: [],
   gymGoals: {
@@ -425,5 +439,294 @@ export const db = {
     data.gymWaterLogs[key] = Math.max(0, Number(glasses) || 0);
     writeDB(data);
     return data.gymWaterLogs;
+  },
+
+  getUsers: () => {
+    const data = readDB();
+    if (!data.gymUsers || !Array.isArray(data.gymUsers) || data.gymUsers.length === 0) {
+      data.gymUsers = [
+        { name: 'Ismael', phone: '', password: '', onboarded: false },
+        { name: 'Sandra', phone: '', password: '', onboarded: false }
+      ];
+      writeDB(data);
+    }
+    return data.gymUsers;
+  },
+
+  findUserByPhone: (phone) => {
+    const data = readDB();
+    const clean = String(phone || '').replace(/\D/g, '');
+    if (!clean || clean.length < 6) return null;
+    const users = data.gymUsers || [];
+    return users.find(u => {
+      const uPhone = String(u.phone || '').replace(/\D/g, '');
+      return uPhone && (uPhone.endsWith(clean) || clean.endsWith(uPhone));
+    }) || null;
+  },
+
+  registerUser: ({ name, phone, password, targetDaysPerWeek, targetWeightKg, goalType, goalLabel, customFocus, level }) => {
+    const data = readDB();
+    if (!data.gymUsers) data.gymUsers = [];
+    const cleanName = (name || '').trim();
+    const cleanPhone = (phone || '').trim().replace(/\s+/g, '');
+    const cleanPassword = (password || '').trim();
+
+    let userObj = data.gymUsers.find(u => u.name.toLowerCase() === cleanName.toLowerCase());
+    if (userObj) {
+      userObj.name = cleanName;
+      userObj.phone = cleanPhone;
+      userObj.password = cleanPassword;
+      userObj.updatedAt = new Date().toISOString();
+    } else {
+      userObj = {
+        name: cleanName,
+        phone: cleanPhone,
+        password: cleanPassword,
+        onboarded: false,
+        createdAt: new Date().toISOString()
+      };
+      data.gymUsers.push(userObj);
+    }
+
+    if (goalType || targetDaysPerWeek) {
+      if (!data.gymGoals) data.gymGoals = {};
+      data.gymGoals[cleanName] = {
+        ...(data.gymGoals[cleanName] || {}),
+        goalType: goalType || 'brazos_abs_grasa',
+        goalLabel: goalLabel || '🔥💪🍫 Perder Grasa + Brazos y Tableta',
+        targetDaysPerWeek: Number(targetDaysPerWeek) || 4,
+        targetWeightKg: targetWeightKg ? Number(targetWeightKg) : null,
+        customFocus: customFocus || '',
+        level: level || 'Duro / Progresivo'
+      };
+      userObj.onboarded = true;
+    }
+
+    writeDB(data);
+    return {
+      success: true,
+      user: {
+        name: userObj.name,
+        phone: userObj.phone,
+        onboarded: !!userObj.onboarded
+      },
+      goals: data.gymGoals || {}
+    };
+  },
+
+  loginUser: ({ identifier, password }) => {
+    const data = readDB();
+    const users = (data.gymUsers && data.gymUsers.length > 0) ? data.gymUsers : [
+      { name: 'Ismael', phone: '', password: '', onboarded: false },
+      { name: 'Sandra', phone: '', password: '', onboarded: false }
+    ];
+    const cleanId = (identifier || '').trim().toLowerCase().replace(/\s+/g, '');
+    const cleanPass = (password || '').trim();
+
+    const userObj = users.find(u => 
+      u.name.toLowerCase() === cleanId || 
+      (u.phone && u.phone.replace(/\s+/g, '') === cleanId)
+    );
+
+    if (!userObj) {
+      return { success: false, error: 'Usuario o teléfono no encontrado' };
+    }
+
+    if (!userObj.password) {
+      return { 
+        success: false, 
+        requiresRegistration: true, 
+        user: { name: userObj.name },
+        error: `El usuario ${userObj.name} aún no ha registrado su teléfono y contraseña.` 
+      };
+    }
+
+    if (userObj.password !== cleanPass) {
+      return { success: false, error: 'Contraseña incorrecta' };
+    }
+
+    return {
+      success: true,
+      user: {
+        name: userObj.name,
+        phone: userObj.phone,
+        onboarded: !!userObj.onboarded
+      },
+      goals: data.gymGoals || {}
+    };
+  },
+
+  setUserOnboarded: (name, onboarded = true) => {
+    const data = readDB();
+    if (!data.gymUsers) return;
+    const userObj = data.gymUsers.find(u => u.name.toLowerCase() === (name || '').trim().toLowerCase());
+    if (userObj) {
+      userObj.onboarded = !!onboarded;
+      writeDB(data);
+    }
+  },
+
+  deleteUserByPhone: (phone) => {
+    const data = readDB();
+    if (!data.gymUsers) return { success: false, error: 'No hay usuarios' };
+    const cleanPhone = (phone || '').replace(/\D/g, '');
+    const userIndex = data.gymUsers.findIndex(u => (u.phone || '').replace(/\D/g, '').endsWith(cleanPhone));
+    if (userIndex === -1) {
+      return { success: false, error: 'Usuario no encontrado' };
+    }
+    const removedUser = data.gymUsers.splice(userIndex, 1)[0];
+    if (data.gymGoals && data.gymGoals[removedUser.name]) {
+      delete data.gymGoals[removedUser.name];
+    }
+    if (data.gymBodyWeights) {
+      data.gymBodyWeights = data.gymBodyWeights.filter(w => w.user !== removedUser.name);
+    }
+    if (data.gymSubscriptions && data.gymSubscriptions[removedUser.name]) {
+      delete data.gymSubscriptions[removedUser.name];
+    }
+    writeDB(data);
+    return { success: true, removedUser };
+  },
+
+  deleteUserByName: (name) => {
+    const data = readDB();
+    if (!data.gymUsers) return { success: false, error: 'No hay usuarios' };
+    const cleanName = (name || '').trim().toLowerCase();
+    const userIndex = data.gymUsers.findIndex(u => u.name.toLowerCase() === cleanName);
+    if (userIndex === -1) {
+      return { success: false, error: 'Usuario no encontrado' };
+    }
+    const removedUser = data.gymUsers.splice(userIndex, 1)[0];
+    const targetName = removedUser.name;
+
+    if (data.gymGoals && data.gymGoals[targetName]) {
+      delete data.gymGoals[targetName];
+    }
+    if (data.gymBodyWeights) {
+      data.gymBodyWeights = data.gymBodyWeights.filter(w => w.user !== targetName);
+    }
+    if (data.gymWorkouts) {
+      data.gymWorkouts = data.gymWorkouts.filter(w => w.user !== targetName);
+    }
+    if (data.gymSubscriptions && data.gymSubscriptions[targetName]) {
+      delete data.gymSubscriptions[targetName];
+    }
+    if (data.gymNfcCards && data.gymNfcCards[targetName]) {
+      delete data.gymNfcCards[targetName];
+    }
+    writeDB(data);
+    return { success: true, removedUser };
+  },
+
+  updateUserProfile: ({ currentName, newName, phone, password, nfcCardId, nfcCardLabel }) => {
+    const data = readDB();
+    if (!data.gymUsers) data.gymUsers = [];
+    const cleanCurrent = (currentName || '').trim().toLowerCase();
+    const userIndex = data.gymUsers.findIndex(u => u.name.toLowerCase() === cleanCurrent);
+    if (userIndex === -1) {
+      return { success: false, error: 'Usuario no encontrado' };
+    }
+
+    const userObj = data.gymUsers[userIndex];
+    const targetName = (newName && newName.trim()) ? newName.trim() : userObj.name;
+
+    if (targetName.toLowerCase() !== userObj.name.toLowerCase()) {
+      const exists = data.gymUsers.some(u => u !== userObj && u.name.toLowerCase() === targetName.toLowerCase());
+      if (exists) {
+        return { success: false, error: 'Ya existe otro usuario con ese nombre' };
+      }
+      const oldName = userObj.name;
+      userObj.name = targetName;
+
+      if (data.gymGoals && data.gymGoals[oldName]) {
+        data.gymGoals[targetName] = data.gymGoals[oldName];
+        delete data.gymGoals[oldName];
+      }
+      if (data.gymWorkouts) {
+        data.gymWorkouts.forEach(w => {
+          if (w.user === oldName) w.user = targetName;
+        });
+      }
+      if (data.gymBodyWeights) {
+        data.gymBodyWeights.forEach(w => {
+          if (w.user === oldName) w.user = targetName;
+        });
+      }
+      if (data.gymSubscriptions && data.gymSubscriptions[oldName]) {
+        data.gymSubscriptions[targetName] = data.gymSubscriptions[oldName];
+        delete data.gymSubscriptions[oldName];
+      }
+      if (data.gymNfcCards && data.gymNfcCards[oldName]) {
+        data.gymNfcCards[targetName] = data.gymNfcCards[oldName];
+        delete data.gymNfcCards[oldName];
+      }
+    }
+
+    if (phone && phone.trim()) {
+      userObj.phone = phone.trim().replace(/\s+/g, '');
+    }
+    if (password && password.trim()) {
+      userObj.password = password.trim();
+    }
+    if (nfcCardId !== undefined) {
+      if (!data.gymNfcCards) data.gymNfcCards = {};
+      data.gymNfcCards[userObj.name] = {
+        cardId: nfcCardId ? nfcCardId.trim() : '',
+        label: nfcCardLabel || 'Llave Gimnasio',
+        updatedAt: new Date().toISOString()
+      };
+    }
+
+    userObj.updatedAt = new Date().toISOString();
+    writeDB(data);
+
+    return {
+      success: true,
+      user: {
+        name: userObj.name,
+        phone: userObj.phone,
+        onboarded: !!userObj.onboarded
+      },
+      nfcCard: data.gymNfcCards ? data.gymNfcCards[userObj.name] : null
+    };
+  },
+
+  getNfcCard: (userName) => {
+    const data = readDB();
+    if (!data.gymNfcCards) return null;
+    return data.gymNfcCards[userName] || null;
+  },
+
+  saveNfcCard: (userName, nfcData) => {
+    const data = readDB();
+    if (!data.gymNfcCards) data.gymNfcCards = {};
+    data.gymNfcCards[userName] = {
+      cardId: nfcData.cardId || '',
+      label: nfcData.label || 'Llave Gimnasio',
+      cardType: nfcData.cardType || 'Mifare / NFC Tag',
+      color: nfcData.color || '#005b99',
+      updatedAt: new Date().toISOString()
+    };
+    writeDB(data);
+    return data.gymNfcCards[userName];
+  },
+
+  getSubscription: (userName) => {
+    const data = readDB();
+    if (!data.gymSubscriptions) data.gymSubscriptions = {};
+    return data.gymSubscriptions[userName] || { planId: 'free', planName: 'Free', price: 0 };
+  },
+
+  updateSubscription: (userName, subData) => {
+    const data = readDB();
+    if (!data.gymSubscriptions) data.gymSubscriptions = {};
+    data.gymSubscriptions[userName] = {
+      planId: subData.planId || 'free',
+      planName: subData.planName || 'Free',
+      price: subData.price || 0,
+      activatedAt: subData.activatedAt || new Date().toISOString()
+    };
+    writeDB(data);
+    return data.gymSubscriptions[userName];
   }
 };

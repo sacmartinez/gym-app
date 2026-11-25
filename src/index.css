@@ -1,28 +1,40 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --bg-gradient: radial-gradient(circle at 50% 0%, #17142b 0%, #0d0b18 60%, #06050b 100%);
-  --glass-bg: rgba(255, 255, 255, 0.04);
-  --glass-bg-hover: rgba(255, 255, 255, 0.07);
-  --glass-bg-active: rgba(255, 255, 255, 0.12);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-border-focus: rgba(16, 185, 129, 0.5);
+  /* Paleta Griega Minimalista Luminosa */
+  --greek-white: #ffffff;
+  --greek-marble: #f8fafc;
+  --greek-marble-soft: #f0f4f8;
+  --greek-sky: #e8f2fc;
   
-  --primary: #10b981;
-  --primary-glow: rgba(16, 185, 129, 0.35);
-  --secondary: #6366f1;
-  --secondary-glow: rgba(99, 102, 241, 0.25);
-  --success: #34d399;
-  --warning: #fbbf24;
-  --danger: #f87171;
+  /* Azul Egeo / Bandera de Grecia */
+  --greek-blue-deep: #004b87;
+  --greek-blue: #005b99;
+  --greek-blue-light: #0ea5e9;
+  --greek-blue-glow: rgba(0, 91, 153, 0.15);
+  
+  /* Dorado Olímpico / Corona de Laurel */
+  --greek-gold: #c59b27;
+  --greek-gold-light: #fef9c3;
+  --greek-gold-dark: #92400e;
+  
+  --primary: #005b99;
+  --primary-hover: #004b87;
+  --secondary: #0ea5e9;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
 
-  --text-main: #f8fafc;
-  --text-muted: #94a3b8;
-  --text-dark: #0f172a;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --text-light: #94a3b8;
+  
+  --border-light: #e2e8f0;
+  --border-focus: #005b99;
 
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 12px 36px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 18px 56px rgba(0, 0, 0, 0.7);
+  --shadow-sm: 0 2px 8px rgba(0, 75, 135, 0.04);
+  --shadow-md: 0 8px 24px rgba(0, 75, 135, 0.08);
+  --shadow-lg: 0 20px 48px rgba(0, 75, 135, 0.12);
   
   --font-sans: 'Outfit', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --border-radius: 20px;
@@ -38,10 +50,13 @@
 html, body {
   width: 100%;
   min-height: 100%;
-  background: #06050b;
+  background: #f4f8fc;
   color: var(--text-main);
   font-family: var(--font-sans);
-  background: var(--bg-gradient);
+  background-image: 
+    radial-gradient(at 100% 0%, rgba(14, 165, 233, 0.08) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(0, 91, 153, 0.06) 0px, transparent 50%),
+    linear-gradient(180deg, #f0f6fc 0%, #ffffff 40%, #f4f8fc 100%);
   background-attachment: fixed;
   overflow-x: hidden;
   line-height: 1.5;
@@ -54,32 +69,32 @@ html, body {
   flex-direction: column;
 }
 
-/* Scrollbars */
+/* Scrollbars claros */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 91, 153, 0.03);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: #cbd5e1;
   border-radius: 8px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: #94a3b8;
 }
 
-/* Modal Overlay & Glass Card */
+/* Modal Overlay & Card Griega Luminosa */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(6, 5, 11, 0.85);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -89,23 +104,23 @@ html, body {
 }
 
 .modal-content {
-  background: #0f111a;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 24px;
   width: 100%;
   max-width: 500px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 25px 60px rgba(0, 75, 135, 0.18);
   position: relative;
+  color: #0f172a;
   animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .glass-card {
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 30px rgba(0, 75, 135, 0.06);
 }
 
 @keyframes fadeIn {

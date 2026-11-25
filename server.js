@@ -24,9 +24,202 @@ if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
 }
 
+// Descarga directa segura del APK para móviles (Forma.apk y CasitaGym.apk)
+app.get(['/Forma.apk', '/CasitaGym.apk'], (req, res) => {
+  const possiblePaths = [
+    path.join(__dirname, 'Forma.apk'),
+    path.join(__dirname, 'dist', 'Forma.apk'),
+    path.join(__dirname, 'public', 'Forma.apk'),
+    path.join(__dirname, 'CasitaGym.apk')
+  ];
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+      res.setHeader('Content-Disposition', 'attachment; filename="Forma.apk"');
+      return res.sendFile(p);
+    }
+  }
+  res.status(404).send('APK no disponible todavía.');
+});
+
 // ==========================================
 // RUTAS API GYM & PERSONAL TRAINER
 // ==========================================
+
+// --- AUTH & USUARIOS (ISMAEL & SANDRA) ---
+app.get('/api/gym/auth/check-phone', (req, res) => {
+  try {
+    const { phone } = req.query;
+    if (!phone) return res.json({ exists: false });
+    const user = db.findUserByPhone(phone);
+    if (user) {
+      return res.json({
+        exists: true,
+        user: {
+          name: user.name,
+          phone: user.phone,
+          onboarded: !!user.onboarded
+        }
+      });
+    }
+    res.json({ exists: false });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al verificar teléfono' });
+  }
+});
+
+app.get('/api/gym/auth/users', (req, res) => {
+  try {
+    const rawUsers = db.getUsers();
+    const users = rawUsers.map(u => ({
+      name: u.name,
+      phone: u.phone ? u.phone.replace(/(\d{3})\d{3}(\d{3})/, '$1***$2') : '',
+      hasPassword: !!u.password,
+      onboarded: !!u.onboarded
+    }));
+    res.json({ users });
+  } catch (error) {
+    console.error('[Auth Users Error]', error);
+    res.status(500).json({ error: 'Error al listar usuarios' });
+  }
+});
+
+app.delete('/api/gym/auth/user/:phone', (req, res) => {
+  try {
+    const { phone } = req.params;
+    const result = db.deleteUserByPhone(phone);
+    if (!result.success) {
+      return res.status(404).json(result);
+    }
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/gym/auth/profile', (req, res) => {
+  try {
+    const { currentName, newName, phone, password, nfcCardId, nfcCardLabel } = req.body;
+    if (!currentName) {
+      return res.status(400).json({ error: 'Falta especificar el usuario actual.' });
+    }
+    const result = db.updateUserProfile({ currentName, newName, phone, password, nfcCardId, nfcCardLabel });
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+    res.json(result);
+  } catch (error) {
+    console.error('[Profile Update Error]', error);
+    res.status(500).json({ error: 'Error al actualizar el perfil' });
+  }
+});
+
+app.delete('/api/gym/auth/account/:user', (req, res) => {
+  try {
+    const { user } = req.params;
+    const result = db.deleteUserByName(user);
+    if (!result.success) {
+      return res.status(404).json(result);
+    }
+    res.json(result);
+  } catch (error) {
+    console.error('[Account Delete Error]', error);
+    res.status(500).json({ error: 'Error al eliminar la cuenta' });
+  }
+});
+
+app.get('/api/gym/nfc/:user', (req, res) => {
+  try {
+    const { user } = req.params;
+    const card = db.getNfcCard(user);
+    res.json({ nfcCard: card });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al consultar tarjeta NFC' });
+  }
+});
+
+app.post('/api/gym/nfc', (req, res) => {
+  try {
+    const { user, cardId, label, cardType, color } = req.body;
+    if (!user) return res.status(400).json({ error: 'Usuario requerido' });
+    const card = db.saveNfcCard(user, { cardId, label, cardType, color });
+    res.json({ success: true, nfcCard: card });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al guardar tarjeta NFC' });
+  }
+});
+
+app.post('/api/gym/auth/register', (req, res) => {
+  try {
+    const { name, phone, password, targetDaysPerWeek, targetWeightKg, goalType, goalLabel, customFocus, level } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'El nombre de usuario es obligatorio.' });
+    }
+    if (!phone || !phone.trim() || phone.trim().replace(/\D/g, '').length < 9) {
+      return res.status(400).json({ error: 'El número de teléfono es obligatorio y debe tener al menos 9 dígitos.' });
+    }
+    if (!password || !password.trim()) {
+      return res.status(400).json({ error: 'La contraseña es obligatoria.' });
+    }
+
+    const result = db.registerUser({
+      name,
+      phone,
+      password,
+      targetDaysPerWeek,
+      targetWeightKg,
+      goalType,
+      goalLabel,
+      customFocus,
+      level
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('[Auth Register Error]', error);
+    res.status(500).json({ error: 'Error al registrar el usuario' });
+  }
+});
+
+app.post('/api/gym/auth/login', (req, res) => {
+  try {
+    const { identifier, password } = req.body;
+    if (!identifier || !identifier.trim() || !password || !password.trim()) {
+      return res.status(400).json({ error: 'Debes indicar usuario o teléfono y tu contraseña.' });
+    }
+
+    const result = db.loginUser({ identifier, password });
+    if (!result.success) {
+      return res.status(401).json(result);
+    }
+    res.json(result);
+  } catch (error) {
+    console.error('[Auth Login Error]', error);
+    res.status(500).json({ error: 'Error al procesar el inicio de sesión' });
+  }
+});
+
+app.post('/api/gym/auth/onboarding', (req, res) => {
+  try {
+    const { user, targetDaysPerWeek, targetWeightKg, goalType, goalLabel, customFocus, level } = req.body;
+    if (!user) {
+      return res.status(400).json({ error: 'Falta especificar el usuario.' });
+    }
+    const goals = db.updateGymGoal(user, {
+      targetDaysPerWeek,
+      targetWeightKg,
+      goalType,
+      goalLabel,
+      customFocus,
+      level
+    });
+    db.setUserOnboarded(user, true);
+    res.json({ success: true, user, goals });
+  } catch (error) {
+    console.error('[Auth Onboarding Error]', error);
+    res.status(500).json({ error: 'Error al guardar objetivos de enfoque' });
+  }
+});
 
 // 1. Obtener todos los datos de Gym
 app.get('/api/gym', (req, res) => {
@@ -114,6 +307,26 @@ app.delete('/api/gym/routines/:id', (req, res) => {
     res.json({ customRoutines });
   } catch (error) {
     res.status(500).json({ error: 'Error al eliminar rutina' });
+  }
+});
+
+// Suscripciones FORMA (1€, 3€, 5€ / mes)
+app.get('/api/gym/subscription/:user', (req, res) => {
+  try {
+    const sub = db.getSubscription(req.params.user);
+    res.json({ subscription: sub });
+  } catch (error) {
+    res.json({ subscription: { planId: 'free', planName: 'Free', price: 0 } });
+  }
+});
+
+app.post('/api/gym/subscription', (req, res) => {
+  try {
+    const { user, planId, planName, price } = req.body;
+    const sub = db.updateSubscription(user, { planId, planName, price });
+    res.json({ success: true, subscription: sub });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al actualizar suscripción' });
   }
 });
 

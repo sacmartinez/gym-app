@@ -1,11 +1,11 @@
 {
-  "name": "Marbella Fit · Personal Trainer & Gym",
-  "short_name": "Marbella Fit",
-  "description": "Tu entrenador personal y registro de entrenamientos, series, pesos y nutrición",
+  "name": "Forma · Intelligent Strength & Dualis Training",
+  "short_name": "Forma",
+  "description": "Entrenamiento inteligente de fuerza, registro de series, pesos, nutrición IA y modo Dualis en pareja.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#06050b",
+  "background_color": "#0b0f19",
   "theme_color": "#10b981",
   "icons": [
     {

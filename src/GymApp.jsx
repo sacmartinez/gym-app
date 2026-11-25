@@ -2,29 +2,36 @@ import React, { useState, useEffect, useRef } from 'react';
 import ExerciseVisualModal from './components/ExerciseVisualModal';
 import GymSocialShareModal from './components/GymSocialShareModal';
 import GymCoopArena from './components/GymCoopArena';
+import WelcomeScreen from './components/auth/WelcomeScreen';
+import AuthScreen from './components/auth/AuthScreen';
+import OnboardingGoalsScreen from './components/auth/OnboardingGoalsScreen';
+import CoopSetupModal from './components/coop/CoopSetupModal';
+import SubscriptionModal, { PLANS } from './components/subscription/SubscriptionModal';
+import AppTutorialModal from './components/tutorial/AppTutorialModal';
+import ProfileModal from './components/profile/ProfileModal';
 
 const GOAL_OPTIONS = [
   {
     id: 'brazos_abs_grasa',
     icon: '🔥💪🍫',
-    label: 'Perder Peso + Muscular Brazos y Tableta de Chocolate (Duro)',
+    label: 'Definición + Brazos y Abdominales (Duro)',
     shortLabel: 'Brazos + Tableta + Quema Grasa',
     color: '#dc2626',
     bg: '#fef2f2',
     border: '#fecaca',
-    kcalTarget: { Ismael: 1950, Sandra: 1650 },
+    kcalTarget: 1950,
     desc: 'Entrenamiento intenso para quemar grasa, ganar volumen en bíceps/tríceps/hombros y marcar abdominales.'
   },
   {
     id: 'grasa',
     icon: '🔥',
-    label: 'Perder Peso y Quemar Grasa',
-    shortLabel: 'Perder Peso',
+    label: 'Pérdida de Grasa y Definición',
+    shortLabel: 'Pérdida de Grasa',
     color: '#ea580c',
     bg: '#fff7ed',
     border: '#fed7aa',
-    kcalTarget: { Ismael: 1950, Sandra: 1600 },
-    desc: 'Bajar kilos de grasa manteniendo el músculo firme, combinando máquinas y cardio.'
+    kcalTarget: 1850,
+    desc: 'Reducir porcentaje graso manteniendo tono y firmeza, combinando fuerza y cardio.'
   },
   {
     id: 'tonificar',
@@ -34,30 +41,30 @@ const GOAL_OPTIONS = [
     color: '#059669',
     bg: '#ecfdf5',
     border: '#a7f3d0',
-    kcalTarget: { Ismael: 2150, Sandra: 1750 },
-    desc: 'Ganar firmeza muscular, agilidad, resistencia y verte mejor.'
+    kcalTarget: 1800,
+    desc: 'Ganar firmeza muscular, agilidad, resistencia y estilizar figura.'
   },
   {
     id: 'hipertrofia',
     icon: '💪',
-    label: 'Ganar Músculo y Fuerza',
+    label: 'Masa Muscular e Hipertrofia',
     shortLabel: 'Músculo y Fuerza',
     color: '#2563eb',
     bg: '#eff6ff',
     border: '#bfdbfe',
-    kcalTarget: { Ismael: 2500, Sandra: 2000 },
-    desc: 'Subir kilos en las máquinas semana a semana y desarrollar masa muscular.'
+    kcalTarget: 2400,
+    desc: 'Sobrecarga progresiva semana a semana para maximizar el desarrollo muscular y la fuerza.'
   },
   {
     id: 'gluteo',
     icon: '🍑',
-    label: 'Foco Pierna, Glúteo y Abdomen',
+    label: 'Foco Pierna, Glúteo y Core',
     shortLabel: 'Pierna y Glúteo',
     color: '#db2777',
     bg: '#fdf2f8',
     border: '#fbcfe8',
-    kcalTarget: { Ismael: 2100, Sandra: 1700 },
-    desc: 'Priorizar tren inferior, glúteos fuertes y cintura firme.'
+    kcalTarget: 1900,
+    desc: 'Priorizar tren inferior, glúteos fuertes y zona media firme.'
   },
   {
     id: 'movilidad',
@@ -67,15 +74,15 @@ const GOAL_OPTIONS = [
     color: '#7c3aed',
     bg: '#f5f3ff',
     border: '#ddd6fe',
-    kcalTarget: { Ismael: 2100, Sandra: 1700 },
-    desc: 'Quitar dolores de espalda del trabajo, mejorar postura y cuidar rodillas.'
+    kcalTarget: 1900,
+    desc: 'Corregir postura, fortalecer espalda lumbar y cuidar articulaciones con ejercicios controlados.'
   }
 ];
 
 // ============================================================================
-// PLAN PRIVADO DURO DE ISMAEL: PERDER PESO + MUSCULAR BRAZOS + TABLETA ABS
+// RUTINAS FORMA: FUERZA, HIPERTROFIA Y DEFINICIÓN (STRENGTH & SHRED)
 // ============================================================================
-const GYM_DAYS_ISMAEL = [
+const ROUTINES_STRENGTH = [
   {
     id: 'dia-1',
     dayNumber: 1,
@@ -141,16 +148,17 @@ const GYM_DAYS_ISMAEL = [
     ]
   }
 ];
+const GYM_DAYS_ISMAEL = ROUTINES_STRENGTH;
 
 // ============================================================================
-// PLAN DE SANDRA: TONIFICAR, PIERNA/GLÚTEO, CUERPO FIRME Y CARDIO
+// RUTINAS FORMA: TONIFICACIÓN, ESCULTURA Y CARDIO (TONING & SCULPT)
 // ============================================================================
-const GYM_DAYS_SANDRA = [
+const ROUTINES_TONING = [
   {
     id: 'dia-1',
     dayNumber: 1,
     shortTab: 'Día 1: Cuerpo Completo',
-    title: '🔥 Día 1: Full Body + Cardio (Casita Gym)',
+    title: '🔥 Día 1: Full Body + Cardio (FORMA)',
     subtitle: 'Activa piernas, espalda, pecho y remata quemando calorías',
     duration: 50,
     exercises: [
@@ -207,16 +215,17 @@ const GYM_DAYS_SANDRA = [
     ]
   }
 ];
+const GYM_DAYS_SANDRA = ROUTINES_TONING;
 
-// Rutinas Express para hacer en CASA (Salón o Despacho) — Exclusivas del perfil de Ismael
+// Rutinas Express para hacer en CASA (Salón o Despacho)
 const HOME_ROUTINES = [
   {
     id: 'casa-brazos-tableta',
-    title: '🍫💪 Especial Duro Ismael: Brazos + Tableta de Chocolate (8 min)',
+    title: '🍫💪 Especial Torso & Tableta Abdominal (8 min)',
     place: 'Salón o Despacho · Foco Abdomen y Brazos',
     durationMin: 8,
     calories: 90,
-    desc: 'Diseñada por Adán para tu objetivo privado: congestiona pecho/tríceps/brazos y ataca las 3 zonas del abdomen (superior, inferior y oblicuos).',
+    desc: 'Congestiona pecho, tríceps y brazos mientras atacas las 3 zonas del abdomen (superior, inferior y oblicuos).',
     exercises: [
       { name: 'Flexiones cerradas (Foco Tríceps y Pecho)', baseTarget: 12, unit: 'reps', scalePerLevel: 2, tip: 'Manos a la anchura de los hombros bajando con los codos pegados al cuerpo para hinchar el brazo.' },
       { name: 'Crunch Abdominal Superior (Apretando 1s arriba)', baseTarget: 20, unit: 'reps', scalePerLevel: 4, tip: 'Suelta todo el aire al subir clavando la zona lumbar en el suelo.' },
@@ -284,11 +293,6 @@ const MOTIVATIONAL_QUOTES = [
   "💎 La disciplina es elegir entre lo que te apetece ahora mismo y lo que más quieres conseguir.",
   "✨ Cada gota de esfuerzo de hoy es energía, salud y confianza para mañana. ¡Tú puedes con esto y más!"
 ];
-
-const USER_PINS = {
-  Ismael: '280894',
-  Sandra: '100415'
-};
 
 // Detecta si un ejercicio es por tiempo (segundos o minutos) y devuelve los segundos totales
 function parseExerciseDurationSeconds(text = '') {
@@ -574,22 +578,22 @@ function getMadridDateStr(daysOffset = 0) {
 
 function GymApp({ onBackToCasita }) {
   const [unlockedUser, setUnlockedUser] = useState(() => {
-    const activeHogarUser = localStorage.getItem('hogar_user') || 'Ismael';
-    if (localStorage.getItem(`gym_unlocked_${activeHogarUser}`) === 'true') {
-      return activeHogarUser;
-    }
-    const saved = localStorage.getItem('marbella_fit_unlocked_user');
-    return (saved === 'Ismael' || saved === 'Sandra') ? saved : null;
+    const saved = localStorage.getItem('forma_unlocked_user') || localStorage.getItem('marbella_fit_unlocked_user') || localStorage.getItem('hogar_user');
+    return saved || null;
   });
-  const [loginTargetUser, setLoginTargetUser] = useState(() => {
-    const saved = localStorage.getItem('hogar_user');
-    return (saved === 'Ismael' || saved === 'Sandra') ? saved : 'Ismael';
-  });
-  const [pinInput, setPinInput] = useState('');
-  const [pinError, setPinError] = useState('');
 
-  const activeUser = unlockedUser || 'Ismael';
-  // Pestañas: Ismael tiene 'gym' | 'home' | 'nutrition' | 'machines'. Sandra tiene 'gym' | 'nutrition' | 'machines' (sin 'home')
+  const [authView, setAuthView] = useState(() => {
+    const saved = localStorage.getItem('forma_unlocked_user') || localStorage.getItem('marbella_fit_unlocked_user') || localStorage.getItem('hogar_user');
+    if (saved) {
+      const isOnboarded = localStorage.getItem(`gym_onboarded_${saved}`) === 'true';
+      return isOnboarded ? 'app' : 'onboarding';
+    }
+    return 'welcome'; // 'welcome' | 'auth' | 'onboarding' | 'app'
+  });
+
+  const [initialAuthMode, setInitialAuthMode] = useState('login');
+
+  const activeUser = unlockedUser || 'Atleta';
   const [activeTab, setActiveTab] = useState('gym');
 
   // Datos del servidor
@@ -598,9 +602,13 @@ function GymApp({ onBackToCasita }) {
   const [meals, setMeals] = useState([]);
   const [waterLogs, setWaterLogs] = useState({});
   const [serverInProgress, setServerInProgress] = useState({});
-  const [goals, setGoals] = useState({
-    Ismael: { goalType: 'brazos_abs_grasa', goalLabel: '🔥💪🍫 Perder Grasa + Brazos y Tableta de Chocolate', customFocus: '', level: 'Duro / Progresivo', targetDaysPerWeek: 4, targetWeightKg: null },
-    Sandra: { goalType: 'tonificar', goalLabel: '⚡ Tonificar y Ponerse en Forma', customFocus: '', level: 'Adaptación / Progresivo', targetDaysPerWeek: 3, targetWeightKg: null }
+  const [goals, setGoals] = useState(() => {
+    try {
+      const savedG = localStorage.getItem(`gym_goal_${activeUser}`);
+      return savedG ? { [activeUser]: JSON.parse(savedG) } : {};
+    } catch (_) {
+      return {};
+    }
   });
 
   // Mantener la pantalla encendida (Screen Wake Lock API) para que no se bloquee en el gimnasio
@@ -632,6 +640,29 @@ function GymApp({ onBackToCasita }) {
   const [shareWorkoutData, setShareWorkoutData] = useState(null);
   const [coopSession, setCoopSession] = useState(null);
   const [showWorkoutTypeModal, setShowWorkoutTypeModal] = useState(false);
+  const [showCoopSetupModal, setShowCoopSetupModal] = useState(false);
+  const [coopConfig, setCoopConfig] = useState(null);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [showTutorialModal, setShowTutorialModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showCalendarView, setShowCalendarView] = useState(false);
+  const [userPlan, setUserPlan] = useState(() => {
+    return localStorage.getItem(`forma_plan_${activeUser}`) || 'free';
+  });
+
+  useEffect(() => {
+    if (activeUser) {
+      fetch(`/api/gym/subscription/${encodeURIComponent(activeUser)}`)
+        .then(r => r.json())
+        .then(d => {
+          if (d?.subscription?.planId) {
+            setUserPlan(d.subscription.planId);
+            localStorage.setItem(`forma_plan_${activeUser}`, d.subscription.planId);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [activeUser]);
 
   const [workoutStartTime, setWorkoutStartTime] = useState(() => {
     try {
@@ -674,16 +705,19 @@ function GymApp({ onBackToCasita }) {
     return () => clearInterval(interval);
   }, []);
 
-  // Función para fusionar las rutinas del día de Ismael y Sandra en una rutina Co-Op compartida
-  const buildCoopRoutineForDay = (dayPlan) => {
-    const ismaelPlan = GYM_DAYS_ISMAEL.find(d => d.id === dayPlan.id) || GYM_DAYS_ISMAEL[0];
-    const sandraPlan = GYM_DAYS_SANDRA.find(d => d.id === dayPlan.id) || GYM_DAYS_SANDRA[0];
+  // Función para fusionar las rutinas del día en una rutina Dualis compartida
+  const buildCoopRoutineForDay = (dayPlan, partner = 'Compañero') => {
+    const strengthPlan = ROUTINES_STRENGTH.find(d => d.id === dayPlan.id) || ROUTINES_STRENGTH[0];
+    const toningPlan = ROUTINES_TONING.find(d => d.id === dayPlan.id) || ROUTINES_TONING[0];
+
+    const p1 = activeUser || 'Atleta 1';
+    const p2 = partner || 'Atleta 2';
 
     const merged = [];
     const seenMachines = new Set();
 
-    (ismaelPlan.exercises || []).forEach((ex, idx) => {
-      const sMatch = (sandraPlan.exercises || []).find(se =>
+    (strengthPlan.exercises || []).forEach((ex, idx) => {
+      const sMatch = (toningPlan.exercises || []).find(se =>
         se.machine.toLowerCase() === ex.machine.toLowerCase() ||
         se.name.toLowerCase().includes(ex.name.toLowerCase().split(' ')[0])
       );
@@ -693,22 +727,22 @@ function GymApp({ onBackToCasita }) {
         name: ex.name,
         machine: ex.machine,
         sets: Math.max(Number(ex.sets) || 3, Number(sMatch?.sets) || 3),
-        tip: ex.tip || sMatch?.tip || 'Coordinad los descansos para no enfriaros.',
+        tip: ex.tip || sMatch?.tip || 'Coordinad los descansos para mantener el pulso activo.',
         isCardio: !!ex.isCardio,
         userConfigs: {
-          Ismael: {
-            weightKg: ex.baseKg?.Ismael ?? 30,
+          [p1]: {
+            weightKg: ex.baseKg?.[p1] ?? (typeof ex.baseKg === 'number' ? ex.baseKg : 25),
             reps: ex.baseReps ?? 12
           },
-          Sandra: {
-            weightKg: sMatch?.baseKg?.Sandra ?? ex.baseKg?.Sandra ?? 15,
+          [p2]: {
+            weightKg: sMatch?.baseKg?.[p2] ?? ex.baseKg?.[p2] ?? (typeof sMatch?.baseKg === 'number' ? sMatch.baseKg : 15),
             reps: sMatch?.baseReps ?? ex.baseReps ?? 12
           }
         }
       });
     });
 
-    (sandraPlan.exercises || []).forEach((se, idx) => {
+    (toningPlan.exercises || []).forEach((se, idx) => {
       if (!seenMachines.has(se.machine.toLowerCase())) {
         seenMachines.add(se.machine.toLowerCase());
         merged.push({
@@ -716,15 +750,15 @@ function GymApp({ onBackToCasita }) {
           name: se.name,
           machine: se.machine,
           sets: Number(se.sets) || 3,
-          tip: se.tip || 'Ajustad el peso en cada turno.',
+          tip: se.tip || 'Ajustad la carga en cada turno.',
           isCardio: !!se.isCardio,
           userConfigs: {
-            Ismael: {
-              weightKg: se.baseKg?.Ismael ?? 30,
+            [p1]: {
+              weightKg: se.baseKg?.[p1] ?? 25,
               reps: se.baseReps ?? 12
             },
-            Sandra: {
-              weightKg: se.baseKg?.Sandra ?? 15,
+            [p2]: {
+              weightKg: se.baseKg?.[p2] ?? 15,
               reps: se.baseReps ?? 12
             }
           }
@@ -753,27 +787,52 @@ function GymApp({ onBackToCasita }) {
     setShowWorkoutTypeModal(true);
   };
 
-  const handleStartCoopWorkout = async () => {
+  const handleStartCoopFlow = async (config) => {
     try {
+      setCoopConfig(config);
+      setShowCoopSetupModal(false);
       const dayPlan = activeGymDays[selectedDayIdx] || activeGymDays[0];
-      const mergedExercises = buildCoopRoutineForDay(dayPlan);
-      const res = await fetch('/api/gym/coop/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user: activeUser,
-          dayId: dayPlan.id,
-          routineName: `🔥 ${dayPlan.shortTab || 'Entrenamiento'} Co-Op`,
-          exercises: mergedExercises
-        })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setCoopSession(data.coopSession);
-        setShowWorkoutTypeModal(false);
+      const mergedExercises = buildCoopRoutineForDay(dayPlan, config.partnerName);
+
+      if (config.deviceMode === 'single') {
+        // Modo 1 solo móvil compartido (Single Device / Turnos alternos automáticos en Modo DUALIS)
+        setCoopSession({
+          id: 'coop-single-' + Date.now(),
+          status: 'active',
+          deviceMode: 'single',
+          partnerName: config.partnerName,
+          partnerPhone: config.partnerPhone,
+          isRegisteredPartner: config.isRegisteredPartner,
+          routineName: `⚡ ${dayPlan.shortTab || 'Entrenamiento'} Dualis`,
+          exercises: mergedExercises,
+          activeTurn: activeUser
+        });
+      } else {
+        // Modo 2 móviles sincronizados en tiempo real
+        const res = await fetch('/api/gym/coop/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user: activeUser,
+            partner: config.partnerName,
+            dayId: dayPlan.id,
+            routineName: `🔥 ${dayPlan.shortTab || 'Entrenamiento'} Co-Op`,
+            exercises: mergedExercises
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setCoopSession({
+            ...data.coopSession,
+            deviceMode: 'dual',
+            partnerName: config.partnerName,
+            partnerPhone: config.partnerPhone,
+            isRegisteredPartner: config.isRegisteredPartner
+          });
+        }
       }
     } catch (e) {
-      console.error('Error starting coop:', e);
+      console.error('Error starting coop flow:', e);
     }
   };
 
@@ -814,9 +873,18 @@ function GymApp({ onBackToCasita }) {
     setQuoteIdx((prev) => (prev + 1) % MOTIVATIONAL_QUOTES.length);
   };
 
-  const activeGymDays = activeUser === 'Ismael' ? GYM_DAYS_ISMAEL : GYM_DAYS_SANDRA;
+  const currentGoalConfig = goals[activeUser] || (() => {
+    try {
+      const g = localStorage.getItem(`gym_goal_${activeUser}`);
+      return g ? JSON.parse(g) : null;
+    } catch (_) { return null; }
+  })();
 
-  // Screen Wake Lock: evita que el móvil apague/bloquee la pantalla mientras estás en Marbella Fit
+  const activeGymDays = (currentGoalConfig?.routineKey === 'TONING' || currentGoalConfig?.goalType === 'tonificar' || currentGoalConfig?.goalType === 'tonificacion_firmeza')
+    ? ROUTINES_TONING
+    : ROUTINES_STRENGTH;
+
+  // Screen Wake Lock: evita que el móvil apague/bloquee la pantalla mientras estás en FORMA
   useEffect(() => {
     let wakeLockSentinel = null;
     const requestWakeLock = async () => {
@@ -861,14 +929,14 @@ function GymApp({ onBackToCasita }) {
   }, [unlockedUser]);
 
   useEffect(() => {
-    document.title = 'Casita Gym · Adán Entrenador';
+    document.title = 'FORMA · Intelligent Training';
     let manifestLink = document.querySelector('link[rel="manifest"]');
     if (!manifestLink) {
       manifestLink = document.createElement('link');
       manifestLink.rel = 'manifest';
       document.head.appendChild(manifestLink);
     }
-    manifestLink.href = '/manifest-gym.json';
+    manifestLink.href = '/manifest.json';
   }, []);
 
   const fetchGymData = async () => {
@@ -885,7 +953,7 @@ function GymApp({ onBackToCasita }) {
         if (data.coopSession !== undefined) setCoopSession(data.coopSession);
       }
     } catch (e) {
-      console.error('Error cargando Casita Gym:', e);
+      console.error('Error cargando FORMA:', e);
     }
   };
 
@@ -1740,39 +1808,23 @@ function GymApp({ onBackToCasita }) {
     .reduce((acc, w) => acc + (Number(w.caloriesBurned) || 0), 0);
 
   const activeGoalObj = GOAL_OPTIONS.find(g => g.id === (goals[activeUser]?.goalType || 'grasa')) || GOAL_OPTIONS[0];
-  const recommendedDailyKcal = activeGoalObj.kcalTarget?.[activeUser] || 1850;
-
-  const handleLoginSubmit = (e) => {
-    e.preventDefault();
-    if (pinInput.trim() === USER_PINS[loginTargetUser]) {
-      setUnlockedUser(loginTargetUser);
-      localStorage.setItem(`gym_unlocked_${loginTargetUser}`, 'true');
-      localStorage.setItem('marbella_fit_unlocked_user', loginTargetUser);
-      localStorage.setItem('hogar_user', loginTargetUser);
-      setPinInput('');
-      setPinError('');
-      if (loginTargetUser === 'Sandra' && activeTab === 'home') {
-        setActiveTab('gym');
-      }
-    } else {
-      setPinError('Contraseña incorrecta. Inténtalo de nuevo.');
-    }
-  };
+  const recommendedDailyKcal = typeof activeGoalObj.kcalTarget === 'number' ? activeGoalObj.kcalTarget : (activeGoalObj.kcalTarget?.[activeUser] || 1950);
 
   const handleLogoutProfile = () => {
     setUnlockedUser(null);
+    localStorage.removeItem('forma_unlocked_user');
     localStorage.removeItem('marbella_fit_unlocked_user');
-    setPinInput('');
-    setPinError('');
+    localStorage.removeItem('hogar_user');
+    setAuthView('welcome');
   };
 
-  // Estilos claros, limpios y muy legibles
+  // Estilos Griegos Minimalistas Luminosos (Blanco Mármol, Azul Egeo y Oro Olímpico)
   const S = {
     page: {
       minHeight: '100vh',
-      background: '#f4f7fb',
+      background: 'linear-gradient(180deg, #f0f6fc 0%, #ffffff 40%, #f4f8fc 100%)',
       color: '#0f172a',
-      fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      fontFamily: '"Plus Jakarta Sans", system-ui, -apple-system, sans-serif',
       paddingBottom: '90px'
     },
     header: {
@@ -1780,8 +1832,10 @@ function GymApp({ onBackToCasita }) {
       top: 0,
       zIndex: 50,
       background: 'rgba(255, 255, 255, 0.96)',
-      backdropFilter: 'blur(10px)',
-      borderBottom: '1px solid #e2e8f0',
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
+      borderBottom: '1.5px solid #e2e8f0',
+      boxShadow: '0 2px 12px rgba(0, 75, 135, 0.04)',
       padding: '0.65rem 1rem'
     },
     container: {
@@ -1794,30 +1848,30 @@ function GymApp({ onBackToCasita }) {
     },
     card: {
       background: '#ffffff',
-      borderRadius: '16px',
-      border: '1px solid #e2e8f0',
-      padding: '1rem',
-      boxShadow: '0 3px 12px rgba(15, 23, 42, 0.04)'
+      borderRadius: '18px',
+      border: '1.5px solid #e2e8f0',
+      padding: '1.1rem',
+      boxShadow: '0 4px 16px rgba(0, 75, 135, 0.05)'
     },
     input: {
       background: '#f8fafc',
-      border: '1px solid #cbd5e1',
-      borderRadius: '10px',
-      padding: '0.55rem 0.7rem',
+      border: '1.5px solid #cbd5e1',
+      borderRadius: '12px',
+      padding: '0.6rem 0.8rem',
       color: '#0f172a',
-      fontSize: '0.88rem',
+      fontSize: '0.9rem',
       outline: 'none'
     },
     btnGreen: {
-      background: 'linear-gradient(135deg, #059669, #10b981)',
+      background: 'linear-gradient(135deg, #005b99, #004b87)',
       color: '#ffffff',
       border: 'none',
-      borderRadius: '12px',
-      padding: '0.8rem 1.1rem',
+      borderRadius: '14px',
+      padding: '0.85rem 1.15rem',
       fontWeight: 800,
-      fontSize: '0.92rem',
+      fontSize: '0.94rem',
       cursor: 'pointer',
-      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)'
+      boxShadow: '0 4px 14px rgba(0, 91, 153, 0.25)'
     },
     bottomNav: {
       position: 'fixed',
@@ -1825,125 +1879,81 @@ function GymApp({ onBackToCasita }) {
       left: 0,
       right: 0,
       zIndex: 60,
-      background: '#ffffff',
+      background: 'rgba(255, 255, 255, 0.96)',
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
       borderTop: '1px solid #e2e8f0',
       display: 'grid',
-      gridTemplateColumns: 'repeat(4, 1fr)',
-      padding: '0.4rem 0.3rem calc(0.4rem + env(safe-area-inset-bottom, 0px))',
-      boxShadow: '0 -4px 18px rgba(15, 23, 42, 0.06)'
+      gridTemplateColumns: 'repeat(5, 1fr)',
+      padding: '0.45rem 0.3rem calc(0.45rem + env(safe-area-inset-bottom, 0px))',
+      boxShadow: '0 -4px 20px rgba(0, 91, 153, 0.06)'
     }
   };
 
   const currentGymDay = activeGymDays[selectedDayIdx] || activeGymDays[0];
   const currentHomeRoutine = HOME_ROUTINES[selectedHomeIdx] || HOME_ROUTINES[0];
 
-  const visibleTabs = activeUser === 'Ismael'
-    ? [
-        { id: 'gym', icon: '🏋️', label: 'Gym' },
-        { id: 'home', icon: '🏠', label: 'En Casa' },
-        { id: 'calendar', icon: '📅', label: 'Calendario' },
-        { id: 'nutrition', icon: '🍎', label: 'Comida/Peso' },
-        { id: 'machines', icon: '🏢', label: 'Máquinas' }
-      ]
-    : [
-        { id: 'gym', icon: '🏋️', label: 'Hoy (Gym)' },
-        { id: 'calendar', icon: '📅', label: 'Calendario' },
-        { id: 'nutrition', icon: '🍎', label: 'Comida y Peso' },
-        { id: 'machines', icon: '🏢', label: 'Máquinas' }
-      ];
+  const visibleTabs = [
+    { id: 'gym', icon: '🏋️', label: 'Gym' },
+    { id: 'home', icon: '🏠', label: 'En Casa' },
+    { id: 'nutrition', icon: '🍎', label: 'Comida/Peso' },
+    { id: 'machines', icon: '🏢', label: 'Máquinas' },
+    { id: 'profile', icon: '👤', label: 'Mi Perfil' }
+  ];
 
-  // Si aún no ha iniciado sesión con su contraseña individual, mostrar pantalla de acceso
-  if (!unlockedUser) {
+  // Vistas de Bienvenida, Autenticación (Login/Registro con teléfono y contraseña) y Onboarding de Objetivos
+  if (authView === 'welcome' || (!unlockedUser && authView === 'welcome')) {
     return (
-      <div style={{ ...S.page, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.2rem' }}>
-        <div style={{ ...S.card, maxWidth: '400px', width: '100%', padding: '1.6rem', textAlign: 'center' }}>
-          <div style={{ fontSize: '2.6rem', marginBottom: '0.3rem' }}>🏋️</div>
-          <h1 style={{ margin: '0 0 0.25rem 0', fontSize: '1.35rem', fontWeight: 900, color: '#0f172a' }}>
-            Casita Gym · Entrenador Adán
-          </h1>
-          <p style={{ margin: '0 0 1.2rem 0', fontSize: '0.82rem', color: '#64748b' }}>
-            Elige tu perfil personal e introduce tu contraseña
-          </p>
+      <WelcomeScreen
+        onGoLogin={() => { setInitialAuthMode('login'); setAuthView('auth'); }}
+        onGoRegister={() => { setInitialAuthMode('register'); setAuthView('auth'); }}
+        onDirectContinue={(user) => {
+          setUnlockedUser(user);
+          setInitialAuthMode('login');
+          setAuthView('auth');
+        }}
+        savedUser={localStorage.getItem('forma_unlocked_user') || localStorage.getItem('marbella_fit_unlocked_user') || localStorage.getItem('hogar_user')}
+        onBackToCasita={onBackToCasita}
+      />
+    );
+  }
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', marginBottom: '1.1rem' }}>
-            {['Ismael', 'Sandra'].map((u) => {
-              const isSel = loginTargetUser === u;
-              return (
-                <button
-                  key={u}
-                  type="button"
-                  onClick={() => { setLoginTargetUser(u); setPinError(''); setPinInput(''); }}
-                  style={{
-                    padding: '0.85rem 0.5rem',
-                    borderRadius: '14px',
-                    border: isSel ? (u === 'Ismael' ? '2px solid #2563eb' : '2px solid #db2777') : '1px solid #e2e8f0',
-                    background: isSel ? (u === 'Ismael' ? '#eff6ff' : '#fdf2f8') : '#f8fafc',
-                    color: '#0f172a',
-                    fontWeight: 800,
-                    fontSize: '0.92rem',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <div style={{ fontSize: '1.5rem', marginBottom: '0.2rem' }}>{u === 'Ismael' ? '👦' : '👧'}</div>
-                  {u}
-                </button>
-              );
-            })}
-          </div>
+  if (authView === 'auth' || !unlockedUser) {
+    return (
+      <AuthScreen
+        initialMode={initialAuthMode}
+        initialUser={unlockedUser || localStorage.getItem('forma_unlocked_user') || localStorage.getItem('hogar_user') || ''}
+        onBackToWelcome={() => setAuthView('welcome')}
+        onSuccessLogin={(userData) => {
+          setUnlockedUser(userData.name);
+          const isOnboarded = userData.onboarded || (localStorage.getItem(`gym_onboarded_${userData.name}`) === 'true');
+          if (!isOnboarded) {
+            setAuthView('onboarding');
+          } else {
+            setAuthView('app');
+          }
+        }}
+        onSuccessRegister={(userData) => {
+          setUnlockedUser(userData.name);
+          setAuthView('onboarding');
+        }}
+        onBackToCasita={onBackToCasita}
+      />
+    );
+  }
 
-          <form onSubmit={handleLoginSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <input
-              type="password"
-              inputMode="numeric"
-              value={pinInput}
-              onChange={(e) => setPinInput(e.target.value)}
-              placeholder={`Contraseña de ${loginTargetUser}`}
-              style={{
-                ...S.input,
-                textAlign: 'center',
-                fontSize: '1.15rem',
-                letterSpacing: '4px',
-                fontWeight: 800,
-                padding: '0.75rem'
-              }}
-              autoFocus
-              required
-            />
-
-            {pinError && (
-              <div style={{ color: '#dc2626', fontSize: '0.78rem', fontWeight: 700, background: '#fef2f2', padding: '0.5rem', borderRadius: '8px', border: '1px solid #fecaca' }}>
-                ⚠️ {pinError}
-              </div>
-            )}
-
-            <button type="submit" style={{ ...S.btnGreen, width: '100%', padding: '0.85rem', fontSize: '0.95rem' }}>
-              🔓 Entrar al Perfil de {loginTargetUser}
-            </button>
-
-            {onBackToCasita && (
-              <button
-                type="button"
-                onClick={onBackToCasita}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#64748b',
-                  fontSize: '0.82rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  marginTop: '0.4rem',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.3rem'
-                }}
-              >
-                <span>‹</span>
-                <span>Volver a CasitaOS</span>
-              </button>
-            )}
-          </form>
-        </div>
-      </div>
+  if (authView === 'onboarding') {
+    return (
+      <OnboardingGoalsScreen
+        userName={unlockedUser || 'Atleta'}
+        onFinishOnboarding={(goalsPayload) => {
+          setGoals(prev => ({
+            ...prev,
+            [goalsPayload.user]: goalsPayload
+          }));
+          setAuthView('app');
+        }}
+      />
     );
   }
 
@@ -1978,8 +1988,21 @@ function GymApp({ onBackToCasita }) {
             )}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                <span style={{ fontWeight: 900, fontSize: '1.02rem', color: '#0f172a' }}>
-                  {activeUser === 'Ismael' ? '👦 Gym de Ismael' : '👧 Gym de Sandra'}
+                <span
+                  onClick={() => setShowProfileModal(true)}
+                  style={{
+                    fontWeight: 900,
+                    fontSize: '1.05rem',
+                    color: '#004b87',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.25rem'
+                  }}
+                  title="Abrir Mi Perfil y Llave NFC"
+                >
+                  <span>FORMA · {activeUser}</span>
+                  <span style={{ fontSize: '0.8rem', color: '#0ea5e9' }}>⚙️</span>
                 </span>
                 <span
                   style={{
@@ -2054,23 +2077,47 @@ function GymApp({ onBackToCasita }) {
               </button>
             )}
 
-            {/* Botón para bloquear / cambiar de usuario con contraseña */}
+            {/* Botón de Suscripción Olímpica (1€, 3€, 5€) */}
             <button
               type="button"
-              onClick={handleLogoutProfile}
+              onClick={() => setShowSubscriptionModal(true)}
               style={{
-                background: '#f1f5f9',
-                border: '1px solid #cbd5e1',
-                color: '#334155',
-                borderRadius: '10px',
-                padding: '0.32rem 0.6rem',
-                fontSize: '0.73rem',
-                fontWeight: 700,
-                cursor: 'pointer'
+                background: userPlan === 'zeus'
+                  ? 'linear-gradient(135deg, #fef3c7, #fde68a)'
+                  : userPlan === 'apolo'
+                  ? 'linear-gradient(135deg, #e0f2fe, #bae6fd)'
+                  : userPlan === 'hermes'
+                  ? '#f0fdf4'
+                  : '#f8fafc',
+                border: `1.5px solid ${
+                  userPlan === 'zeus'
+                    ? '#f59e0b'
+                    : userPlan === 'apolo'
+                    ? '#0284c7'
+                    : userPlan === 'hermes'
+                    ? '#10b981'
+                    : '#cbd5e1'
+                }`,
+                color: userPlan === 'zeus'
+                  ? '#78350f'
+                  : userPlan === 'apolo'
+                  ? '#004b87'
+                  : userPlan === 'hermes'
+                  ? '#065f46'
+                  : '#005b99',
+                borderRadius: '999px',
+                padding: '0.32rem 0.65rem',
+                fontSize: '0.72rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                boxShadow: '0 2px 6px rgba(0, 91, 153, 0.08)'
               }}
-              title="Cambiar de perfil"
+              title="Ver planes de suscripción (1€, 3€, 5€)"
             >
-              🔒 Cambiar perfil
+              <span>{userPlan === 'zeus' ? '👑 Zeus (5€)' : userPlan === 'apolo' ? '⚡ Apolo (3€)' : userPlan === 'hermes' ? '🪽 Hermes (1€)' : '🏛️ Planes'}</span>
             </button>
           </div>
         </div>
@@ -2083,10 +2130,8 @@ function GymApp({ onBackToCasita }) {
           <div style={{
             ...S.card,
             padding: '0.85rem 1rem',
-            background: activeUser === 'Sandra'
-              ? 'linear-gradient(135deg, #fdf2f8 0%, #fff1f2 50%, #ffffff 100%)'
-              : 'linear-gradient(135deg, #eff6ff 0%, #ecfdf5 50%, #ffffff 100%)',
-            border: activeUser === 'Sandra' ? '1px solid #fbcfe8' : '1px solid #bfdbfe',
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(37, 99, 235, 0.08) 100%)',
+            border: '1px solid rgba(16, 185, 129, 0.25)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -2097,11 +2142,11 @@ function GymApp({ onBackToCasita }) {
                 fontSize: '0.68rem',
                 fontWeight: 800,
                 textTransform: 'uppercase',
-                color: activeUser === 'Sandra' ? '#db2777' : '#2563eb',
+                color: '#059669',
                 marginBottom: '0.2rem',
                 letterSpacing: '0.3px'
               }}>
-                🧑‍🏫 Adán te dice hoy, {activeUser}:
+                ⚡ Coach FORMA · Motivación:
               </div>
               <div style={{
                 fontSize: '0.86rem',
@@ -2119,8 +2164,8 @@ function GymApp({ onBackToCasita }) {
               onClick={nextQuote}
               style={{
                 background: '#ffffff',
-                border: activeUser === 'Sandra' ? '1px solid #f9a8d4' : '1px solid #93c5fd',
-                color: activeUser === 'Sandra' ? '#be185d' : '#1d4ed8',
+                border: '1px solid #a7f3d0',
+                color: '#059669',
                 borderRadius: '10px',
                 padding: '0.4rem 0.65rem',
                 fontSize: '0.72rem',
@@ -2129,7 +2174,7 @@ function GymApp({ onBackToCasita }) {
                 whiteSpace: 'nowrap',
                 boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
               }}
-              title="Ver otra frase motivadora de Adán"
+              title="Ver otra frase motivadora"
             >
               ✨ Otra frase
             </button>
@@ -2145,19 +2190,24 @@ function GymApp({ onBackToCasita }) {
               </span>
               <button
                 type="button"
-                onClick={() => setActiveTab('calendar')}
+                onClick={() => setShowCalendarView(!showCalendarView)}
                 style={{
-                  background: '#eff6ff',
-                  border: '1px solid #93c5fd',
-                  color: '#1d4ed8',
+                  background: showCalendarView ? '#005b99' : '#eff6ff',
+                  border: `1px solid ${showCalendarView ? '#004b87' : '#93c5fd'}`,
+                  color: showCalendarView ? '#ffffff' : '#1d4ed8',
                   borderRadius: '999px',
-                  padding: '0.18rem 0.6rem',
+                  padding: '0.22rem 0.65rem',
                   fontSize: '0.68rem',
                   fontWeight: 800,
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  transition: 'all 0.15s ease'
                 }}
               >
-                📅 Ver Mes / Validar Días →
+                <span>📅</span>
+                <span>{showCalendarView ? 'Ocultar Mes ▲' : 'Consultar Mes ▼'}</span>
               </button>
             </div>
 
@@ -2183,7 +2233,7 @@ function GymApp({ onBackToCasita }) {
                     type="button"
                     onClick={() => {
                       setSelectedCalendarDate(wd.dateStr);
-                      setActiveTab('calendar');
+                      setShowCalendarView(true);
                     }}
                     style={{
                       background: bg,
@@ -2360,7 +2410,7 @@ function GymApp({ onBackToCasita }) {
                   }}
                 >
                   <span>📸</span>
-                  <span>Generar Imagen para Redes (Casita Gym · {activeUser})</span>
+                  <span>Generar Imagen para Redes (FORMA · {activeUser})</span>
                 </button>
 
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -2381,37 +2431,44 @@ function GymApp({ onBackToCasita }) {
                   >
                     🔓 Desbloquear para corregir un dato de hoy
                   </button>
-                  {activeUser === 'Ismael' && (
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('home')}
-                      style={{
-                        background: '#eff6ff',
-                        border: '1px solid #93c5fd',
-                        color: '#1d4ed8',
-                        borderRadius: '10px',
-                        padding: '0.6rem 0.9rem',
-                        fontSize: '0.78rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        flex: 1
-                      }}
-                    >
-                      🍫 Ir a Abdominales / Brazos en Casa →
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('home')}
+                    style={{
+                      background: '#eff6ff',
+                      border: '1px solid #93c5fd',
+                      color: '#1d4ed8',
+                      borderRadius: '10px',
+                      padding: '0.6rem 0.9rem',
+                      fontSize: '0.78rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      flex: 1
+                    }}
+                  >
+                    🏠 Ir a Rutinas en Casa →
+                  </button>
                 </div>
               </div>
             ) : coopSession && (coopSession.status === 'active' || coopSession.status === 'completed' || (coopSession.status === 'waiting' && coopSession.ready?.[activeUser])) ? (
               <GymCoopArena
                 activeUser={activeUser}
                 coopSession={coopSession}
+                deviceMode={coopConfig?.deviceMode || coopSession?.deviceMode || 'single'}
+                partnerName={coopConfig?.partnerName || 'Compañero'}
+                partnerPhone={coopConfig?.partnerPhone || ''}
+                isRegisteredPartner={coopConfig?.isRegisteredPartner ?? true}
+                onOpenVisualModal={(item) => setVisualModalItem(item)}
                 onRefreshSession={fetchCoopSession}
                 onOpenShareModal={(duoData) => {
                   setShareWorkoutData(duoData);
                   setShowShareModal(true);
                 }}
                 onExitCoop={() => {
+                  setCoopSession(null);
+                  fetchGymData();
+                }}
+                onWorkoutCompleted={() => {
                   setCoopSession(null);
                   fetchGymData();
                 }}
@@ -2500,7 +2557,7 @@ function GymApp({ onBackToCasita }) {
                 <div style={S.card}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.55rem', flexWrap: 'wrap', gap: '0.4rem' }}>
                     <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#059669', textTransform: 'uppercase' }}>
-                      📍 Al llegar a entrenar · Plan de Casita Gym
+                      📍 Al llegar a entrenar · Plan FORMA
                     </span>
                     <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
                       {todayCompletedGymWorkout && editingCompletedToday && (
@@ -2521,7 +2578,7 @@ function GymApp({ onBackToCasita }) {
                           🔒 Volver a bloquear hoy
                         </button>
                       )}
-                      {activeUser === 'Ismael' && !didHomeToday && (
+                      {!didHomeToday && (
                         <button
                           type="button"
                           onClick={() => setActiveTab('home')}
@@ -2616,7 +2673,7 @@ function GymApp({ onBackToCasita }) {
                         cursor: 'pointer'
                       }}
                     >
-                      {activeUser === 'Ismael' ? '👦 Solo Ismael' : '👧 Solo Sandra'}
+                      👤 Solo {activeUser}
                     </button>
                     <button
                       type="button"
@@ -2633,7 +2690,7 @@ function GymApp({ onBackToCasita }) {
                         cursor: 'pointer'
                       }}
                     >
-                      👫 ¡Vamos juntos! (Guardar a los 2)
+                      ⚡ Modo DUALIS (En Pareja)
                     </button>
                   </div>
                 </div>
@@ -2655,10 +2712,10 @@ function GymApp({ onBackToCasita }) {
                   }}>
                     <span style={{ fontSize: '2.4rem' }}>🚀</span>
                     <h3 style={{ margin: 0, fontSize: '1.18rem', fontWeight: 900 }}>
-                      ¿Listo para entrenar hoy en Casita Gym?
+                      ¿Listo para entrenar hoy en FORMA?
                     </h3>
                     <p style={{ margin: 0, fontSize: '0.82rem', opacity: 0.92, maxWidth: '420px', lineHeight: 1.45 }}>
-                      Pulsa para marcar tu <strong>hora de entrada</strong>. Calcularemos el tiempo exacto en el gym y tus estadísticas para la tarjeta de <strong>Casita Gym</strong>.
+                      Pulsa para marcar tu <strong>hora de entrada</strong>. Calcularemos el tiempo exacto en el gym y tus estadísticas para la tarjeta de <strong>FORMA</strong>.
                     </p>
                     <button
                       type="button"
@@ -2999,7 +3056,7 @@ function GymApp({ onBackToCasita }) {
                           }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.65rem' }}>
                               <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0369a1' }}>
-                                📟 Datos de la Pantalla de Cardio (Casita Gym)
+                                📟 Datos de la Pantalla de Cardio (FORMA)
                               </div>
 
                               <label style={{
@@ -3600,9 +3657,9 @@ function GymApp({ onBackToCasita }) {
         )}
 
         {/* ====================================================================
-            PESTAÑA CALENDARIO: 📅 POSITIVO (✅) / NEGATIVO (❌) DE GYM Y CASA
+            CONSULTA DEL CALENDARIO: 📅 POSITIVO (✅) / NEGATIVO (❌) DE GYM Y CASA
            ==================================================================== */}
-        {activeTab === 'calendar' && (() => {
+        {((showCalendarView && (activeTab === 'gym' || activeTab === 'home')) || activeTab === 'calendar') && (() => {
           const baseNow = new Date();
           const viewDate = new Date(baseNow.getFullYear(), baseNow.getMonth() + calendarMonthOffset, 1);
           const viewYear = viewDate.getFullYear();
@@ -3657,6 +3714,25 @@ function GymApp({ onBackToCasita }) {
                     >
                       ▶
                     </button>
+                    {showCalendarView && (
+                      <button
+                        type="button"
+                        onClick={() => setShowCalendarView(false)}
+                        style={{
+                          background: '#f1f5f9',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '8px',
+                          padding: '0.3rem 0.6rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          color: '#64748b',
+                          marginLeft: '0.2rem'
+                        }}
+                        title="Ocultar consulta de calendario"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -3853,43 +3929,39 @@ function GymApp({ onBackToCasita }) {
                     })}
                   </div>
 
-                  {activeUser === 'Ismael' && (
-                    <>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#334155', marginBottom: '0.4rem' }}>
-                        🏠 Validar rutina de Casa en el día {selectedCalendarDate}:
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                        {HOME_ROUTINES.map(hr => {
-                          const doneOnSelected = selectedDayInfo.homeList.some(w => w.routineId === hr.id || w.routineName === hr.title);
-                          return (
-                            <button
-                              key={hr.id}
-                              type="button"
-                              disabled={savingHome}
-                              onClick={() => handleCompleteHomeWorkout(hr, selectedCalendarDate)}
-                              style={{
-                                background: doneOnSelected ? '#ecfdf5' : '#f8fafc',
-                                border: doneOnSelected ? '2px solid #10b981' : '1px solid #cbd5e1',
-                                color: doneOnSelected ? '#047857' : '#0f172a',
-                                borderRadius: '10px',
-                                padding: '0.55rem 0.75rem',
-                                fontSize: '0.75rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                textAlign: 'left',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center'
-                              }}
-                            >
-                              <span>{doneOnSelected ? '✅ Validada: ' : '+ Validar: '} {hr.title}</span>
-                              {doneOnSelected && <span style={{ fontSize: '0.68rem', color: '#059669' }}>HECHO</span>}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </>
-                  )}
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#334155', marginBottom: '0.4rem', marginTop: '0.8rem' }}>
+                    🏠 Validar rutina de Casa en el día {selectedCalendarDate}:
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    {HOME_ROUTINES.map(hr => {
+                      const doneOnSelected = selectedDayInfo.homeList.some(w => w.routineId === hr.id || w.routineName === hr.title);
+                      return (
+                        <button
+                          key={hr.id}
+                          type="button"
+                          disabled={savingHome}
+                          onClick={() => handleCompleteHomeWorkout(hr, selectedCalendarDate)}
+                          style={{
+                            background: doneOnSelected ? '#ecfdf5' : '#f8fafc',
+                            border: doneOnSelected ? '2px solid #10b981' : '1px solid #cbd5e1',
+                            color: doneOnSelected ? '#047857' : '#0f172a',
+                            borderRadius: '10px',
+                            padding: '0.55rem 0.75rem',
+                            fontSize: '0.75rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <span>{doneOnSelected ? '✅ Validada: ' : '+ Validar: '} {hr.title}</span>
+                          {doneOnSelected && <span style={{ fontSize: '0.68rem', color: '#059669' }}>HECHO</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </>
@@ -4153,9 +4225,31 @@ function GymApp({ onBackToCasita }) {
           <>
             {/* Selector de Objetivo de cada uno */}
             <div style={S.card}>
-              <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1rem', color: '#0f172a' }}>
-                🎯 ¿Cuál es el objetivo principal de {activeUser} con Adán?
-              </h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.6rem' }}>
+                <h3 style={{ margin: 0, fontSize: '1rem', color: '#0f172a' }}>
+                  🎯 Objetivo principal de {activeUser}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setAuthView('onboarding')}
+                  style={{
+                    background: '#eff6ff',
+                    border: '1px solid #bfdbfe',
+                    color: '#1d4ed8',
+                    borderRadius: '8px',
+                    padding: '0.35rem 0.65rem',
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.3rem'
+                  }}
+                >
+                  <span>⚙️</span>
+                  <span>Reajustar enfoque completo</span>
+                </button>
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.5rem' }}>
                 {GOAL_OPTIONS.map(g => {
                   const isSel = (goals[activeUser]?.goalType || 'grasa') === g.id;
@@ -4187,10 +4281,10 @@ function GymApp({ onBackToCasita }) {
               </div>
             </div>
 
-            {/* Guía de Máquinas del Gimnasio Marbella */}
+            {/* Guía de Máquinas & Equipamiento FORMA */}
             <div style={S.card}>
               <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1rem', color: '#0f172a' }}>
-                🏢 Máquinas de Casita Gym (Vía Lusitana 1)
+                🏢 Máquinas & Equipamiento de FORMA
               </h3>
               <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
                 {['TODAS', 'Pierna y Glúteo', 'Pecho y Espalda', 'Hombros y Brazos', 'Cardio'].map(z => (
@@ -4315,26 +4409,26 @@ function GymApp({ onBackToCasita }) {
       {showWorkoutTypeModal && (
         <div className="modal-overlay" onClick={() => setShowWorkoutTypeModal(false)} style={{ zIndex: 120 }}>
           <div
-            className="modal-content glass-card"
+            className="modal-content"
             onClick={(e) => e.stopPropagation()}
             style={{
               maxWidth: '440px',
               width: '92%',
-              padding: '1.4rem',
-              borderRadius: '22px',
-              background: '#0f172a',
-              border: '1.5px solid rgba(16, 185, 129, 0.4)',
-              color: '#ffffff',
+              padding: '1.6rem 1.4rem',
+              borderRadius: '24px',
+              background: '#ffffff',
+              border: '1.5px solid #e2e8f0',
+              color: '#0f172a',
               textAlign: 'center',
-              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.7)'
+              boxShadow: '0 25px 70px rgba(0, 91, 153, 0.16)'
             }}
           >
-            <div style={{ fontSize: '2.8rem', marginBottom: '0.2rem' }}>🏋️</div>
-            <h3 style={{ margin: '0 0 0.35rem 0', fontSize: '1.25rem', fontWeight: 900 }}>
+            <div style={{ fontSize: '2.8rem', marginBottom: '0.2rem' }}>🏛️</div>
+            <h3 style={{ margin: '0 0 0.35rem 0', fontSize: '1.3rem', fontWeight: 900, color: '#004b87' }}>
               ¿Cómo vas a entrenar hoy?
             </h3>
-            <p style={{ margin: '0 0 1.2rem 0', fontSize: '0.84rem', color: '#94a3b8' }}>
-              Elige si entrenas por tu cuenta o si entrenáis juntos Ismael y Sandra compartiendo máquinas y turnos de descanso.
+            <p style={{ margin: '0 0 1.2rem 0', fontSize: '0.84rem', color: '#64748b', lineHeight: 1.45 }}>
+              Elige si entrenas por tu cuenta o con tu compañero/a en Modo DUALIS con cronómetro inteligente y turnos sincronizados.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
@@ -4346,21 +4440,23 @@ function GymApp({ onBackToCasita }) {
                 }}
                 style={{
                   padding: '1rem',
-                  borderRadius: '14px',
-                  border: '1.5px solid rgba(56, 189, 248, 0.35)',
-                  background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%)',
-                  color: '#ffffff',
+                  borderRadius: '16px',
+                  border: '1.5px solid #e2e8f0',
+                  background: '#ffffff',
+                  color: '#0f172a',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.8rem',
-                  textAlign: 'left'
+                  textAlign: 'left',
+                  boxShadow: '0 2px 10px rgba(0, 91, 153, 0.04)',
+                  transition: 'all 0.15s ease'
                 }}
               >
                 <span style={{ fontSize: '1.8rem' }}>👤</span>
                 <div>
-                  <div style={{ fontWeight: 800, fontSize: '0.98rem' }}>Entrenar solo ({activeUser})</div>
-                  <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
+                  <div style={{ fontWeight: 800, fontSize: '0.98rem', color: '#0f172a' }}>Entrenar solo ({activeUser})</div>
+                  <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
                     Tu rutina personal paso a paso con tus series y descansos individuales.
                   </div>
                 </div>
@@ -4370,29 +4466,30 @@ function GymApp({ onBackToCasita }) {
                 type="button"
                 onClick={() => {
                   setShowWorkoutTypeModal(false);
-                  handleStartCoopWorkout();
+                  setShowCoopSetupModal(true);
                 }}
                 style={{
                   padding: '1rem',
-                  borderRadius: '14px',
-                  border: '2px solid #ec4899',
-                  background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.22) 0%, rgba(139, 92, 246, 0.22) 100%)',
-                  color: '#ffffff',
+                  borderRadius: '16px',
+                  border: '2px solid #005b99',
+                  background: 'linear-gradient(135deg, #f0f7ff 0%, #e0f2fe 100%)',
+                  color: '#004b87',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.8rem',
                   textAlign: 'left',
-                  boxShadow: '0 4px 20px rgba(236, 72, 153, 0.35)'
+                  boxShadow: '0 4px 16px rgba(0, 91, 153, 0.15)',
+                  transition: 'all 0.15s ease'
                 }}
               >
-                <span style={{ fontSize: '1.8rem' }}>👫</span>
+                <span style={{ fontSize: '1.8rem' }}>⚡</span>
                 <div>
-                  <div style={{ fontWeight: 900, fontSize: '1rem', color: '#f472b6' }}>
-                    Entrenar juntos (Ismael & Sandra) ⚡
+                  <div style={{ fontWeight: 900, fontSize: '1rem', color: '#005b99' }}>
+                    Entrenamiento Dualis (En Pareja) ⚡
                   </div>
-                  <div style={{ fontSize: '0.74rem', color: '#cbd5e1' }}>
-                    Modo juego interactivo: mismas máquinas, turnos alternos (uno entrena y otro descansa).
+                  <div style={{ fontSize: '0.74rem', color: '#475569' }}>
+                    Modo interactivo: 1 móvil compartido (turnos por colores) o 2 móviles sincronizados.
                   </div>
                 </div>
               </button>
@@ -4404,8 +4501,9 @@ function GymApp({ onBackToCasita }) {
               style={{
                 background: 'none',
                 border: 'none',
-                color: '#94a3b8',
+                color: '#64748b',
                 fontSize: '0.82rem',
+                fontWeight: 700,
                 cursor: 'pointer'
               }}
             >
@@ -4415,23 +4513,77 @@ function GymApp({ onBackToCasita }) {
         </div>
       )}
 
-      {/* BARRA INFERIOR ADAPTADA AL PERFIL (4 pestañas para Ismael con En Casa, 3 para Sandra solo Gym) */}
+      {/* MODAL DE CONFIGURACIÓN COOPERATIVO (1 o 2 móviles, teléfono y WhatsApp) */}
+      {showCoopSetupModal && (
+        <CoopSetupModal
+          activeUser={activeUser}
+          onClose={() => setShowCoopSetupModal(false)}
+          onStartCoop={handleStartCoopFlow}
+        />
+      )}
+
+      {/* MODAL DE SUSCRIPCIÓN OLÍMPICA (1€, 3€, 5€/mes) */}
+      {showSubscriptionModal && (
+        <SubscriptionModal
+          isOpen={showSubscriptionModal}
+          onClose={() => setShowSubscriptionModal(false)}
+          activeUser={activeUser}
+          currentPlanId={userPlan}
+          onPlanChanged={(p) => setUserPlan(p.id)}
+        />
+      )}
+
+      {/* MODAL DE TUTORIAL Y PERMISOS DE DISPOSITIVO */}
+      {showTutorialModal && (
+        <AppTutorialModal
+          isOpen={showTutorialModal}
+          onClose={() => setShowTutorialModal(false)}
+        />
+      )}
+
+      {/* MODAL DE PERFIL DE ATLETA, OBJETIVOS Y LLAVE NFC (BETA) */}
+      {showProfileModal && (
+        <ProfileModal
+          isOpen={showProfileModal}
+          onClose={() => setShowProfileModal(false)}
+          activeUser={activeUser}
+          userGoal={goals[activeUser]}
+          onUserUpdated={(newName) => {
+            if (newName && newName !== activeUser) {
+              setUnlockedUser(newName);
+              localStorage.setItem('forma_unlocked_user', newName);
+            }
+          }}
+          onUserLoggedOut={handleLogoutProfile}
+          onUserDeleted={() => {
+            setShowProfileModal(false);
+            handleLogoutProfile();
+          }}
+          onOpenPlans={() => setShowSubscriptionModal(true)}
+        />
+      )}
+
+      {/* BARRA INFERIOR ADAPTADA */}
       <nav
         style={{
           ...S.bottomNav,
           gridTemplateColumns: `repeat(${visibleTabs.length}, 1fr)`
         }}
-        aria-label="Menú principal Casita Gym"
+        aria-label="Menú principal FORMA"
       >
         {visibleTabs.map(tab => {
-          const isAct = activeTab === tab.id;
+          const isAct = tab.id === 'profile' ? showProfileModal : activeTab === tab.id;
           return (
             <button
               key={tab.id}
               type="button"
               onClick={() => {
-                setActiveTab(tab.id);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
+                if (tab.id === 'profile') {
+                  setShowProfileModal(true);
+                } else {
+                  setActiveTab(tab.id);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
               }}
               style={{
                 background: 'none',
@@ -4443,14 +4595,15 @@ function GymApp({ onBackToCasita }) {
                 gap: '0.15rem',
                 padding: '0.2rem 0',
                 cursor: 'pointer',
-                color: isAct ? '#059669' : '#64748b',
+                color: isAct ? '#005b99' : '#64748b',
                 fontWeight: isAct ? 800 : 600,
                 fontSize: '0.72rem'
               }}
             >
               <span style={{
                 fontSize: '1.25rem',
-                background: isAct ? '#ecfdf5' : 'transparent',
+                background: isAct ? '#f0f7ff' : 'transparent',
+                border: isAct ? '1px solid #bae6fd' : '1px solid transparent',
                 padding: '0.12rem 0.7rem',
                 borderRadius: '999px'
               }}>

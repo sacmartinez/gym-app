@@ -3,3 +3,9 @@ dist
 .env
 .DS_Store
 *.log
+*.apk
+android/app/build
+android/.gradle
+.gradle
+
+

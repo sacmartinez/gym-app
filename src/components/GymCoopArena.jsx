@@ -1,433 +1,313 @@
 import React, { useState, useEffect, useRef } from 'react';
 
+// Sonido sintetizado agradable y vibración para el final del crono
+function playCoopTimerBeep() {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate([200, 100, 250]);
+    }
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    [523.25, 659.25, 783.99].forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.18, ctx.currentTime + idx * 0.16);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.16 + 0.15);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + idx * 0.16);
+      osc.stop(ctx.currentTime + idx * 0.16 + 0.15);
+    });
+  } catch (_) {}
+}
+
 export default function GymCoopArena({
   activeUser = 'Ismael',
   coopSession,
+  deviceMode = 'single', // 'single' (1 móvil compartido) | 'dual' (2 móviles)
+  partnerName = 'Sandra',
+  partnerPhone = '',
+  isRegisteredPartner = true,
   onRefreshSession,
   onOpenShareModal,
-  onExitCoop
+  onOpenVisualModal,
+  onExitCoop,
+  onWorkoutCompleted
 }) {
-  const [localWeight, setLocalWeight] = useState(null);
-  const [localReps, setLocalReps] = useState(null);
-  const [submittingTurn, setSubmittingTurn] = useState(false);
-  const [activeCheerToast, setActiveCheerToast] = useState(null);
+  const isHostIsmael = activeUser === 'Ismael';
+  const effectivePartner = partnerName || (isHostIsmael ? 'Sandra' : 'Ismael');
+
+  // En modo 1 móvil, gestionamos el turno local ('Ismael' o partnerName)
+  const [singleTurnUser, setSingleTurnUser] = useState(activeUser);
+  const [currentExIdx, setCurrentExIdx] = useState(0);
+  const [currentSetNum, setCurrentSetNum] = useState(1);
+  const [exercisesList, setExercisesList] = useState(() => coopSession?.exercises || []);
+
+  // Pesos y repeticiones ajustables en vivo por usuario
+  const [userWeights, setUserWeights] = useState({});
+  const [userReps, setUserReps] = useState({});
+
+  // Cronómetro de descanso entre series
   const [restSeconds, setRestSeconds] = useState(0);
+  const [restRunning, setRestRunning] = useState(false);
   const restTimerRef = useRef(null);
-  const lastCheerIdRef = useRef(null);
 
-  const partner = activeUser === 'Ismael' ? 'Sandra' : 'Ismael';
+  // Modal de sobrecarga progresiva ("¿Qué tal fue el ejercicio?")
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackDecisions, setFeedbackDecisions] = useState({}); // { [exIdx]: 'subir' | 'mantener' | 'bajar' }
 
-  // Sonido suave / háptico al pasar de turno o recibir ánimo
-  const triggerHaptic = (pattern = [80]) => {
-    if (typeof navigator !== 'undefined' && navigator.vibrate) {
-      try {
-        navigator.vibrate(pattern);
-      } catch (_) {}
-    }
-  };
+  // Duración total del entreno
+  const [startTime] = useState(() => Date.now());
+  const [elapsedMin, setElapsedMin] = useState(0);
 
-  // Cronómetro de descanso activo
   useEffect(() => {
-    if (!coopSession || coopSession.status !== 'active') return;
+    const t = setInterval(() => {
+      setElapsedMin(Math.max(1, Math.round((Date.now() - startTime) / 60000)));
+    }, 10000);
+    return () => clearInterval(t);
+  }, [startTime]);
 
-    const isMyTurn = coopSession.activeTurnUser === activeUser;
-    if (!isMyTurn) {
-      // Estoy descansando: contar segundos
-      setRestSeconds(0);
-      restTimerRef.current = setInterval(() => {
-        setRestSeconds((s) => s + 1);
-      }, 1000);
-    } else {
+  // Manejo del cronómetro de descanso
+  useEffect(() => {
+    if (!restRunning) {
       if (restTimerRef.current) clearInterval(restTimerRef.current);
-      setRestSeconds(0);
+      return;
     }
+
+    restTimerRef.current = setInterval(() => {
+      setRestSeconds((prev) => {
+        if (prev <= 1) {
+          clearInterval(restTimerRef.current);
+          setRestRunning(false);
+          playCoopTimerBeep();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
     return () => {
       if (restTimerRef.current) clearInterval(restTimerRef.current);
     };
-  }, [coopSession?.status, coopSession?.activeTurnUser, activeUser]);
+  }, [restRunning]);
 
-  // Detector de nuevos ánimos recibidos
-  useEffect(() => {
-    if (!coopSession || !Array.isArray(coopSession.cheers) || coopSession.cheers.length === 0) return;
-    const lastCheer = coopSession.cheers[coopSession.cheers.length - 1];
-    if (lastCheer && lastCheer.to === activeUser && lastCheer.id !== lastCheerIdRef.current) {
-      lastCheerIdRef.current = lastCheer.id;
-      setActiveCheerToast(lastCheer);
-      triggerHaptic([60, 40, 60]);
-      const timer = setTimeout(() => {
-        setActiveCheerToast(null);
-      }, 3500);
-      return () => clearTimeout(timer);
-    }
-  }, [coopSession?.cheers, activeUser]);
-
-  if (!coopSession) return null;
-
-  const currentEx = coopSession.exercises?.[coopSession.currentExerciseIndex] || null;
-  const isMyTurn = coopSession.activeTurnUser === activeUser;
-  const myConfig = currentEx?.userConfigs?.[activeUser] || { weightKg: 20, reps: 12 };
-  const partnerConfig = currentEx?.userConfigs?.[partner] || { weightKg: 15, reps: 12 };
-
-  // Inicializar pesos locales al cambiar de ejercicio
-  const effectiveWeight = localWeight !== null ? localWeight : (myConfig.weightKg || 0);
-  const effectiveReps = localReps !== null ? localReps : (myConfig.reps || 10);
-
-  // 1. LOBBY DE ESPERA / CONFIRMACIÓN
-  if (coopSession.status === 'waiting') {
-    const isReady = !!coopSession.ready?.[activeUser];
-    const isPartnerReady = !!coopSession.ready?.[partner];
-
-    const handleConfirmJoin = async () => {
-      try {
-        const res = await fetch('/api/gym/coop/confirm', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user: activeUser })
-        });
-        if (res.ok) {
-          triggerHaptic([100, 50, 100]);
-          if (onRefreshSession) onRefreshSession();
-        }
-      } catch (err) {
-        console.error('Error confirmando:', err);
-      }
-    };
-
-    const handleCancelLobby = async () => {
-      if (window.confirm('¿Quieres cancelar la sesión en pareja y salir?')) {
-        try {
-          await fetch('/api/gym/coop/leave', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user: activeUser })
-          });
-          if (onExitCoop) onExitCoop();
-        } catch (_) {}
-      }
-    };
-
-    return (
-      <div style={{
-        margin: '1rem 0',
-        padding: '1.4rem',
-        borderRadius: '20px',
-        background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%)',
-        border: '1.5px solid rgba(236, 72, 153, 0.4)',
-        boxShadow: '0 12px 35px rgba(0, 0, 0, 0.5)',
-        textAlign: 'center',
-        color: '#ffffff'
-      }}>
-        <div style={{ fontSize: '3rem', marginBottom: '0.4rem' }}>👫</div>
-        <h2 style={{ margin: '0 0 0.3rem 0', fontSize: '1.3rem', fontWeight: 900 }}>
-          Lobby de Entrenamiento en Pareja
-        </h2>
-        <p style={{ margin: '0 0 1.2rem 0', fontSize: '0.86rem', color: '#cbd5e1' }}>
-          {coopSession.routineName}
-        </p>
-
-        {/* Estado de preparación de cada uno */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '0.75rem',
-          marginBottom: '1.3rem'
-        }}>
-          {/* Card Ismael */}
-          <div style={{
-            padding: '0.85rem',
-            borderRadius: '14px',
-            background: coopSession.ready?.Ismael ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.04)',
-            border: coopSession.ready?.Ismael ? '1.5px solid #10b981' : '1px solid rgba(255, 255, 255, 0.1)'
-          }}>
-            <div style={{ fontSize: '1.6rem' }}>🏋️‍♂️</div>
-            <div style={{ fontWeight: 800, fontSize: '0.92rem', marginTop: '0.2rem' }}>Ismael</div>
-            <div style={{ fontSize: '0.75rem', color: coopSession.ready?.Ismael ? '#34d399' : '#94a3b8', fontWeight: 700, marginTop: '0.2rem' }}>
-              {coopSession.ready?.Ismael ? '✅ Listo para entrenar' : '⏳ Esperando confirmación'}
-            </div>
-          </div>
-
-          {/* Card Sandra */}
-          <div style={{
-            padding: '0.85rem',
-            borderRadius: '14px',
-            background: coopSession.ready?.Sandra ? 'rgba(236, 72, 153, 0.18)' : 'rgba(255, 255, 255, 0.04)',
-            border: coopSession.ready?.Sandra ? '1.5px solid #ec4899' : '1px solid rgba(255, 255, 255, 0.1)'
-          }}>
-            <div style={{ fontSize: '1.6rem' }}>🧘‍♀️</div>
-            <div style={{ fontWeight: 800, fontSize: '0.92rem', marginTop: '0.2rem' }}>Sandra</div>
-            <div style={{ fontSize: '0.75rem', color: coopSession.ready?.Sandra ? '#f472b6' : '#94a3b8', fontWeight: 700, marginTop: '0.2rem' }}>
-              {coopSession.ready?.Sandra ? '✅ Lista para entrenar' : '⏳ Esperando confirmación'}
-            </div>
-          </div>
-        </div>
-
-        {/* Acciones del Lobby */}
-        {!isReady ? (
-          <button
-            type="button"
-            onClick={handleConfirmJoin}
-            style={{
-              width: '100%',
-              padding: '0.95rem',
-              borderRadius: '14px',
-              border: 'none',
-              background: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
-              color: '#ffffff',
-              fontWeight: 900,
-              fontSize: '1rem',
-              cursor: 'pointer',
-              boxShadow: '0 6px 20px rgba(236, 72, 153, 0.4)',
-              marginBottom: '0.6rem'
-            }}
-          >
-            ✅ ¡Aceptar y Empezar Juntos!
-          </button>
-        ) : !isPartnerReady ? (
-          <div style={{
-            padding: '0.8rem',
-            borderRadius: '12px',
-            background: 'rgba(255, 255, 255, 0.04)',
-            marginBottom: '0.8rem',
-            fontSize: '0.84rem',
-            color: '#facc15'
-          }}>
-            ⏳ Esperando a que <strong>{partner}</strong> abra la app en su dispositivo y pulse <strong>"Aceptar"</strong>...
-          </div>
-        ) : null}
-
-        <button
-          type="button"
-          onClick={handleCancelLobby}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: '#94a3b8',
-            fontSize: '0.8rem',
-            cursor: 'pointer',
-            padding: '0.4rem'
-          }}
-        >
-          Cancelar sesión en pareja
-        </button>
-      </div>
-    );
-  }
-
-  // 2. SESIÓN COMPLETADA (VICTORIA CO-OP)
-  if (coopSession.status === 'completed') {
-    const handleShare = () => {
-      if (onOpenShareModal) {
-        onOpenShareModal({
-          isDuo: true,
-          routineName: coopSession.routineName,
-          durationMin: coopSession.durationMin || 50,
-          caloriesBurned: coopSession.caloriesBurned || 420,
-          completedCount: coopSession.exercises?.length || 7,
-          totalCount: coopSession.exercises?.length || 7,
-          feeling: '🔥 100% Sincronización',
-          exercises: (coopSession.exercises || []).map((e) => ({
-            name: e.name,
-            machine: e.machine,
-            weightKg: e.userConfigs?.[activeUser]?.weightKg || 20,
-            reps: e.userConfigs?.[activeUser]?.reps || 12,
-            completed: true
-          }))
-        });
-      }
-    };
-
-    const handleFinishAndExit = async () => {
-      try {
-        await fetch('/api/gym/coop/leave', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user: activeUser })
-        });
-        if (onExitCoop) onExitCoop();
-      } catch (_) {}
-    };
-
-    return (
-      <div style={{
-        margin: '1.2rem 0',
-        padding: '1.6rem',
-        borderRadius: '24px',
-        background: 'linear-gradient(135deg, #091224 0%, #0d1e38 100%)',
-        border: '2px solid #10b981',
-        boxShadow: '0 16px 40px rgba(16, 185, 129, 0.25)',
-        textAlign: 'center',
-        color: '#ffffff'
-      }}>
-        <div style={{ fontSize: '3.4rem', marginBottom: '0.3rem' }}>🏆</div>
-        <h2 style={{ margin: '0 0 0.3rem 0', fontSize: '1.35rem', fontWeight: 900 }}>
-          ¡ENTRENAMIENTO EN PAREJA COMPLETADO!
-        </h2>
-        <p style={{ margin: '0 0 1.2rem 0', fontSize: '0.88rem', color: '#34d399', fontWeight: 700 }}>
-          ¡Gran trabajo en equipo, Ismael y Sandra!
-        </p>
-
-        {/* Grid de logros compartidos */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(2, 1fr)',
-          gap: '0.6rem',
-          marginBottom: '1.3rem'
-        }}>
-          <div style={{ padding: '0.8rem', borderRadius: '12px', background: 'rgba(255, 255, 255, 0.04)' }}>
-            <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>TIEMPO JUNTOS</div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#38bdf8' }}>{coopSession.durationMin || 50} MIN</div>
-          </div>
-          <div style={{ padding: '0.8rem', borderRadius: '12px', background: 'rgba(255, 255, 255, 0.04)' }}>
-            <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>QUEMA COMBINADA</div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#fb923c' }}>~{(coopSession.caloriesBurned || 420) * 2} KCAL</div>
-          </div>
-          <div style={{ padding: '0.8rem', borderRadius: '12px', background: 'rgba(255, 255, 255, 0.04)' }}>
-            <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>MÁQUINAS SUPERADAS</div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#34d399' }}>{coopSession.exercises?.length || 7} ESTACIONES</div>
-          </div>
-          <div style={{ padding: '0.8rem', borderRadius: '12px', background: 'rgba(255, 255, 255, 0.04)' }}>
-            <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>SINCRONIZACIÓN</div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#f472b6' }}>100% EQUIPO</div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-          <button
-            type="button"
-            onClick={handleShare}
-            style={{
-              padding: '0.9rem',
-              borderRadius: '14px',
-              border: 'none',
-              background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)',
-              color: '#ffffff',
-              fontWeight: 900,
-              fontSize: '0.96rem',
-              cursor: 'pointer',
-              boxShadow: '0 6px 20px rgba(220, 39, 67, 0.4)'
-            }}
-          >
-            📸 Generar Historia Dúo · Casita Gym
-          </button>
-
-          <button
-            type="button"
-            onClick={handleFinishAndExit}
-            style={{
-              padding: '0.75rem',
-              borderRadius: '12px',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              background: 'rgba(255, 255, 255, 0.05)',
-              color: '#cbd5e1',
-              fontWeight: 700,
-              fontSize: '0.86rem',
-              cursor: 'pointer'
-            }}
-          >
-            🏁 Finalizar y Salir
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // 3. SESIÓN EN CURSO: DINÁMICA DE TURNOS ALTERNOS ("UNO ENTRENA, EL OTRO DESCANSA")
-  const handleFinishMySet = async () => {
-    if (submittingTurn || !currentEx) return;
-    setSubmittingTurn(true);
-    triggerHaptic([100, 50, 100]);
-
-    try {
-      const res = await fetch('/api/gym/coop/turn', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user: activeUser,
-          exerciseIndex: coopSession.currentExerciseIndex,
-          setNumber: coopSession.currentSetNumber,
-          weightKg: effectiveWeight,
-          reps: effectiveReps
-        })
-      });
-      if (res.ok) {
-        setLocalWeight(null);
-        setLocalReps(null);
-        if (onRefreshSession) onRefreshSession();
-      }
-    } catch (err) {
-      console.error('Error terminando serie:', err);
-    } finally {
-      setSubmittingTurn(false);
-    }
+  const startRestTimer = (seconds = 60) => {
+    setRestSeconds(seconds);
+    setRestRunning(true);
   };
 
-  const handleSendCheer = async (type, text) => {
-    triggerHaptic([50]);
-    try {
-      await fetch('/api/gym/coop/cheer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from: activeUser,
-          cheerType: type,
-          text
-        })
-      });
-      if (onRefreshSession) onRefreshSession();
-    } catch (_) {}
-  };
-
-  const totalExercises = coopSession.exercises?.length || 1;
-  const currentIdx = (coopSession.currentExerciseIndex || 0) + 1;
+  const currentEx = exercisesList[currentExIdx] || null;
   const targetSets = currentEx?.sets || 3;
-  const currentSetNum = coopSession.currentSetNumber || 1;
+
+  // Determinar de quién es el turno
+  const isTurnIsmael = deviceMode === 'single'
+    ? singleTurnUser === 'Ismael'
+    : (coopSession?.activeTurn === 'Ismael');
+
+  const currentTurnUserName = deviceMode === 'single'
+    ? singleTurnUser
+    : (coopSession?.activeTurn || activeUser);
+
+  const nextTurnUserName = currentTurnUserName === 'Ismael' ? effectivePartner : 'Ismael';
+
+  // Configuración del ejercicio actual para quien entrena en este turno
+  const currentConfig = currentEx?.userConfigs?.[currentTurnUserName] || {
+    weightKg: currentEx?.weightKg || (currentTurnUserName === 'Ismael' ? 30 : 15),
+    reps: currentEx?.reps || 12
+  };
+
+  const effectiveWeight = userWeights[`${currentExIdx}_${currentTurnUserName}`] !== undefined
+    ? userWeights[`${currentExIdx}_${currentTurnUserName}`]
+    : currentConfig.weightKg;
+
+  const effectiveReps = userReps[`${currentExIdx}_${currentTurnUserName}`] !== undefined
+    ? userReps[`${currentExIdx}_${currentTurnUserName}`]
+    : currentConfig.reps;
+
+  // =========================================================================
+  // ACCIÓN AL COMPLETAR SERIE EN 1 MÓVIL O 2 MÓVILES
+  // =========================================================================
+  const handleCompleteSetSingleDevice = () => {
+    // Iniciar cronómetro de descanso automático para el que acaba de terminar
+    startRestTimer(60);
+
+    // Alternar turno
+    if (singleTurnUser === 'Ismael') {
+      setSingleTurnUser(effectivePartner);
+    } else {
+      // Ambos han hecho su serie en este ciclo
+      if (currentSetNum < targetSets) {
+        setCurrentSetNum((s) => s + 1);
+        setSingleTurnUser('Ismael');
+      } else {
+        // Han completado todas las series de esta máquina -> Preguntar qué tal fue
+        setShowFeedbackModal(true);
+      }
+    }
+  };
+
+  const handleDecisionSubmit = (decision) => {
+    // Guardar decisión de sobrecarga ('subir' | 'mantener' | 'bajar')
+    setFeedbackDecisions((prev) => ({
+      ...prev,
+      [currentExIdx]: decision
+    }));
+
+    setShowFeedbackModal(false);
+
+    // Pasar a la siguiente máquina o finalizar entreno
+    if (currentExIdx + 1 < exercisesList.length) {
+      setCurrentExIdx((idx) => idx + 1);
+      setCurrentSetNum(1);
+      setSingleTurnUser('Ismael');
+      setRestSeconds(90); // descanso más largo al cambiar de máquina
+      setRestRunning(true);
+    } else {
+      // ENTRENAMIENTO COMPLETO!
+      finishCoopWorkout();
+    }
+  };
+
+  // Guardado y sincronización dual
+  const finishCoopWorkout = async () => {
+    const totalVolume = exercisesList.reduce((acc, ex, idx) => {
+      const ismaKg = userWeights[`${idx}_Ismael`] || ex.userConfigs?.Ismael?.weightKg || 30;
+      const sandraKg = userWeights[`${idx}_Sandra`] || ex.userConfigs?.Sandra?.weightKg || 15;
+      return acc + (ismaKg * 12 * 3) + (sandraKg * 12 * 3);
+    }, 0);
+
+    const workoutDate = new Date().toISOString().split('T')[0];
+
+    // Payload para Ismael
+    const ismaelWorkout = {
+      user: 'Ismael',
+      type: 'gym',
+      date: workoutDate,
+      routineName: `🔥 Entreno Dúo: Ismael & ${effectivePartner} (1 Móvil)`,
+      category: 'Gimnasio Marbella',
+      durationMin: elapsedMin || 48,
+      caloriesBurned: Math.round(380 + elapsedMin * 4.5),
+      totalVolumeKg: Math.round(totalVolume / 2),
+      feeling: '🔥 100% Sincronización en Pareja',
+      notes: `Sesión compartida con ${effectivePartner}. feedback: ${JSON.stringify(feedbackDecisions)}`,
+      trainTogether: true,
+      partner: effectivePartner,
+      exercises: exercisesList.map((ex, idx) => ({
+        name: ex.name,
+        machine: ex.machine,
+        sets: ex.sets || 3,
+        reps: String(userReps[`${idx}_Ismael`] || ex.userConfigs?.Ismael?.reps || 12),
+        weightKg: Number(userWeights[`${idx}_Ismael`] || ex.userConfigs?.Ismael?.weightKg || 30),
+        nextAction: feedbackDecisions[idx] || 'mantener',
+        completed: true
+      }))
+    };
+
+    // Payload para Sandra si está registrada o es el partner
+    const sandraWorkout = {
+      user: effectivePartner,
+      type: 'gym',
+      date: workoutDate,
+      routineName: `🔥 Entreno Dúo: ${effectivePartner} & Ismael (1 Móvil)`,
+      category: 'Gimnasio Marbella',
+      durationMin: elapsedMin || 48,
+      caloriesBurned: Math.round(320 + elapsedMin * 3.8),
+      totalVolumeKg: Math.round(totalVolume / 2),
+      feeling: '🔥 100% Sincronización en Pareja',
+      notes: `Sesión compartida con Ismael. feedback: ${JSON.stringify(feedbackDecisions)}`,
+      trainTogether: true,
+      partner: 'Ismael',
+      exercises: exercisesList.map((ex, idx) => ({
+        name: ex.name,
+        machine: ex.machine,
+        sets: ex.sets || 3,
+        reps: String(userReps[`${idx}_${effectivePartner}`] || ex.userConfigs?.[effectivePartner]?.reps || 12),
+        weightKg: Number(userWeights[`${idx}_${effectivePartner}`] || ex.userConfigs?.[effectivePartner]?.weightKg || 15),
+        nextAction: feedbackDecisions[idx] || 'mantener',
+        completed: true
+      }))
+    };
+
+    try {
+      // Guardar para Ismael
+      await fetch('/api/gym/workouts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ismaelWorkout)
+      });
+
+      // Si el compañero está registrado en la base de datos (Sandra u otro), guardar también en su perfil
+      if (isRegisteredPartner || effectivePartner === 'Sandra' || effectivePartner === 'Ismael') {
+        await fetch('/api/gym/workouts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(sandraWorkout)
+        });
+      }
+    } catch (e) {
+      console.warn('Error guardando entrenos cooperativos:', e);
+    }
+
+    if (onWorkoutCompleted) {
+      onWorkoutCompleted({ ismaelWorkout, sandraWorkout });
+    }
+  };
+
+  // Estilos de la tarjeta según de quién sea el turno (Estética Griega Clara Minimalista)
+  // Turno 1: Azul Egeo olímpico (#005B99) sobre mármol blanco
+  // Turno 2: Amatista / Lavanda mediterráneo (#7C3AED) sobre mármol blanco
+  const cardGradient = isTurnIsmael
+    ? 'linear-gradient(145deg, #ffffff 0%, #f0f7ff 50%, #e0f2fe 100%)'
+    : 'linear-gradient(145deg, #ffffff 0%, #faf5ff 50%, #f3e8ff 100%)';
+
+  const cardBorder = isTurnIsmael
+    ? '2.5px solid #005B99'
+    : '2.5px solid #7c3aed';
+
+  const cardShadow = isTurnIsmael
+    ? '0 16px 36px rgba(0, 91, 153, 0.16)'
+    : '0 16px 36px rgba(124, 58, 237, 0.16)';
+
+  const userEmoji = currentTurnUserName === (effectivePartner || 'Compañero') ? '⚡' : '🏛️';
+  const userColor = isTurnIsmael ? '#005b99' : '#6d28d9';
 
   return (
-    <div style={{ margin: '1rem 0', position: 'relative' }}>
-      {/* Toast flotante de ánimos en tiempo real */}
-      {activeCheerToast && (
-        <div style={{
-          position: 'fixed',
-          top: '20px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 150,
-          background: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)',
-          color: '#ffffff',
-          padding: '0.75rem 1.4rem',
-          borderRadius: '999px',
-          fontWeight: 800,
-          fontSize: '0.9rem',
-          boxShadow: '0 10px 30px rgba(236, 72, 153, 0.6)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          animation: 'pulse 1s infinite alternate'
-        }}>
-          <span>{activeCheerToast.from === 'Sandra' ? '🧘‍♀️' : '🏋️‍♂️'}</span>
-          <span>{activeCheerToast.text}</span>
-        </div>
-      )}
-
-      {/* Cabecera Co-Op */}
+    <div style={{ margin: '0.8rem 0', position: 'relative', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+      {/* Barra Superior con Estado del Modo */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: '0.6rem 0.9rem',
+        padding: '0.65rem 0.95rem',
         borderRadius: '16px',
-        background: 'rgba(15, 23, 42, 0.85)',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
-        marginBottom: '0.8rem',
-        color: '#ffffff'
+        background: '#ffffff',
+        border: '1px solid #e2e8f0',
+        marginBottom: '0.85rem',
+        color: '#0f172a',
+        boxShadow: '0 4px 15px rgba(0,0,0,0.03)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span style={{ fontSize: '1.2rem' }}>👫</span>
+          <span style={{ fontSize: '1.3rem' }}>⚡</span>
           <div>
-            <div style={{ fontWeight: 800, fontSize: '0.84rem' }}>MODO CO-OP · CASITA GYM</div>
-            <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
-              Estación {currentIdx} de {totalExercises}
+            <div style={{ fontWeight: 900, fontSize: '0.86rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#0f172a' }}>
+              <span>DUALIS: {activeUser || 'Atleta 1'} & {effectivePartner || 'Atleta 2'}</span>
+              <span style={{
+                fontSize: '0.65rem',
+                background: deviceMode === 'single' ? '#e0f2fe' : '#f3e8ff',
+                color: deviceMode === 'single' ? '#005b99' : '#6d28d9',
+                border: deviceMode === 'single' ? '1px solid #bae6fd' : '1px solid #ddd6fe',
+                padding: '0.15rem 0.45rem',
+                borderRadius: '999px',
+                fontWeight: 800
+              }}>
+                {deviceMode === 'single' ? '📱 1 Móvil' : '📲📲 2 Móviles'}
+              </span>
+            </div>
+            <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+              Estación {currentExIdx + 1} de {exercisesList.length} · {elapsedMin} min
             </div>
           </div>
         </div>
@@ -435,20 +315,18 @@ export default function GymCoopArena({
         <button
           type="button"
           onClick={() => {
-            if (window.confirm('¿Deseas salir del modo en pareja?')) {
-              fetch('/api/gym/coop/leave', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user: activeUser })
-              }).then(() => onExitCoop && onExitCoop());
+            if (window.confirm('¿Quieres salir del entrenamiento conjunto?')) {
+              onExitCoop && onExitCoop();
             }
           }}
           style={{
-            background: 'none',
-            border: 'none',
-            color: '#ef4444',
-            fontSize: '0.75rem',
-            fontWeight: 700,
+            background: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid rgba(239, 68, 68, 0.25)',
+            color: '#dc2626',
+            borderRadius: '999px',
+            padding: '0.35rem 0.75rem',
+            fontSize: '0.74rem',
+            fontWeight: 800,
             cursor: 'pointer'
           }}
         >
@@ -456,259 +334,386 @@ export default function GymCoopArena({
         </button>
       </div>
 
-      {/* Tarjeta Principal Dinámica según de quién sea el turno */}
-      {isMyTurn ? (
-        /* VISTA: MI TURNO DE ENTRENAR */
-        <div style={{
-          padding: '1.3rem',
-          borderRadius: '22px',
-          background: 'linear-gradient(135deg, rgba(6, 78, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%)',
-          border: '2px solid #10b981',
-          boxShadow: '0 12px 35px rgba(16, 185, 129, 0.3)',
-          color: '#ffffff'
-        }}>
-          {/* Badge Mi Turno */}
+      {/* TARJETA DINÁMICA QUE CAMBIA DE COLOR (AZUL EGEO / MORADO AMATISTA) */}
+      <div style={{
+        padding: '1.4rem',
+        borderRadius: '24px',
+        background: cardGradient,
+        border: cardBorder,
+        boxShadow: cardShadow,
+        color: '#0f172a',
+        transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+        position: 'relative'
+      }}>
+        {/* Cabecera de Turno Directa: muestra la ficha con el color del usuario */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.9rem' }}>
           <div style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '0.4rem',
-            padding: '0.3rem 0.8rem',
+            gap: '0.45rem',
+            background: '#ffffff',
+            border: `1.5px solid ${isTurnIsmael ? '#93c5fd' : '#c4b5fd'}`,
+            padding: '0.35rem 0.85rem',
             borderRadius: '999px',
-            background: '#10b981',
-            color: '#022c22',
-            fontSize: '0.74rem',
+            fontSize: '0.85rem',
             fontWeight: 900,
-            marginBottom: '0.8rem'
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
           }}>
-            <span>⚡</span>
-            <span>¡TU TURNO! · SERIE {currentSetNum} DE {targetSets}</span>
+            <span style={{ fontSize: '1.1rem' }}>{userEmoji}</span>
+            <span style={{ color: userColor }}>{currentTurnUserName.toUpperCase()}</span>
           </div>
 
-          <h3 style={{ margin: '0 0 0.2rem 0', fontSize: '1.25rem', fontWeight: 900 }}>
-            {currentEx?.name}
-          </h3>
-          <div style={{ fontSize: '0.84rem', color: '#6ee7b7', fontWeight: 700, marginBottom: '0.9rem' }}>
-            🏢 {currentEx?.machine}
-          </div>
-
-          {/* Ajuste de Kilos y Repeticiones */}
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '0.65rem',
-            marginBottom: '1rem'
+            fontSize: '0.78rem',
+            fontWeight: 900,
+            color: '#005b99',
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            padding: '0.3rem 0.7rem',
+            borderRadius: '999px'
           }}>
-            {/* Control de Kilos */}
-            <div style={{
-              padding: '0.75rem',
-              borderRadius: '14px',
-              background: 'rgba(0, 0, 0, 0.35)',
-              textAlign: 'center',
-              border: '1px solid rgba(255, 255, 255, 0.1)'
-            }}>
-              <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 800 }}>TUS KILOS (KG)</div>
-              <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#38bdf8', margin: '0.2rem 0' }}>
-                {effectiveWeight} kg
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '0.4rem' }}>
-                <button
-                  type="button"
-                  onClick={() => setLocalWeight(Math.max(0, effectiveWeight - 2.5))}
-                  style={{ width: '32px', height: '32px', borderRadius: '8px', border: 'none', background: '#334155', color: '#fff', fontWeight: 900, cursor: 'pointer' }}
-                >
-                  -
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLocalWeight(effectiveWeight + 2.5)}
-                  style={{ width: '32px', height: '32px', borderRadius: '8px', border: 'none', background: '#334155', color: '#fff', fontWeight: 900, cursor: 'pointer' }}
-                >
-                  +
-                </button>
-              </div>
-            </div>
-
-            {/* Control de Reps */}
-            <div style={{
-              padding: '0.75rem',
-              borderRadius: '14px',
-              background: 'rgba(0, 0, 0, 0.35)',
-              textAlign: 'center',
-              border: '1px solid rgba(255, 255, 255, 0.1)'
-            }}>
-              <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 800 }}>TUS REPS</div>
-              <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#fb923c', margin: '0.2rem 0' }}>
-                {effectiveReps}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '0.4rem' }}>
-                <button
-                  type="button"
-                  onClick={() => setLocalReps(Math.max(1, (parseInt(effectiveReps) || 10) - 1))}
-                  style={{ width: '32px', height: '32px', borderRadius: '8px', border: 'none', background: '#334155', color: '#fff', fontWeight: 900, cursor: 'pointer' }}
-                >
-                  -
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLocalReps((parseInt(effectiveReps) || 10) + 1)}
-                  style={{ width: '32px', height: '32px', borderRadius: '8px', border: 'none', background: '#334155', color: '#fff', fontWeight: 900, cursor: 'pointer' }}
-                >
-                  +
-                </button>
-              </div>
-            </div>
+            SERIE {currentSetNum} DE {targetSets}
           </div>
+        </div>
 
-          {/* Consejo de Adán */}
-          {currentEx?.tip && (
-            <div style={{
-              fontSize: '0.78rem',
-              color: '#cbd5e1',
-              fontStyle: 'italic',
-              background: 'rgba(255, 255, 255, 0.04)',
-              padding: '0.6rem 0.8rem',
-              borderRadius: '10px',
-              marginBottom: '1rem',
-              borderLeft: '3px solid #10b981'
-            }}>
-              💡 {currentEx.tip}
-            </div>
-          )}
+        {/* Nombre del Ejercicio y Máquina */}
+        <h2 style={{
+          margin: '0 0 0.25rem 0',
+          fontSize: '1.35rem',
+          fontWeight: 900,
+          lineHeight: 1.25,
+          color: '#0f172a'
+        }}>
+          {currentEx?.name}
+        </h2>
 
-          {/* Botón Principal para completar serie y pasar turno */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          fontSize: '0.82rem',
+          color: '#64748b',
+          fontWeight: 700,
+          marginBottom: '1.1rem'
+        }}>
+          <span>🏢 {currentEx?.machine}</span>
+        </div>
+
+        {/* BOTONES: INSTRUCCIONES DE EJERCICIO + FOTO MÁQUINA */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '0.6rem',
+          marginBottom: '1.2rem'
+        }}>
           <button
             type="button"
-            disabled={submittingTurn}
-            onClick={handleFinishMySet}
+            onClick={() => onOpenVisualModal && onOpenVisualModal({ name: currentEx.name, machine: currentEx.machine })}
             style={{
-              width: '100%',
-              padding: '1rem',
-              borderRadius: '16px',
-              border: 'none',
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              color: '#ffffff',
-              fontWeight: 900,
-              fontSize: '1.05rem',
+              padding: '0.65rem 0.6rem',
+              borderRadius: '12px',
+              border: '1px solid #cbd5e1',
+              background: '#ffffff',
+              color: '#0f172a',
+              fontSize: '0.78rem',
+              fontWeight: 800,
               cursor: 'pointer',
-              boxShadow: '0 8px 24px rgba(16, 185, 129, 0.45)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '0.5rem'
+              gap: '0.4rem',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
             }}
           >
-            <span>✅</span>
-            <span>{submittingTurn ? 'Sincronizando...' : `¡Serie Completada! Pasar turno a ${partner} →`}</span>
+            <span>📖</span>
+            <span>Técnica & Músculos</span>
           </button>
 
-          <div style={{ marginTop: '0.6rem', textAlign: 'center', fontSize: '0.75rem', color: '#94a3b8' }}>
-            {partner} está descansando y pendiente de tu serie
-          </div>
+          <button
+            type="button"
+            onClick={() => onOpenVisualModal && onOpenVisualModal({ name: currentEx.name, machine: currentEx.machine })}
+            style={{
+              padding: '0.65rem 0.6rem',
+              borderRadius: '12px',
+              border: '1px solid #cbd5e1',
+              background: '#ffffff',
+              color: '#0f172a',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.4rem',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
+            }}
+          >
+            <span>📸</span>
+            <span>Ver Máquina / Foto</span>
+          </button>
         </div>
-      ) : (
-        /* VISTA: TURNO DE DESCANSO (EL COMPAÑERO ESTÁ ENTRENANDO) */
+
+        {/* AJUSTE DE PESOS Y REPETICIONES DEL USUARIO ACTUAL */}
         <div style={{
-          padding: '1.3rem',
-          borderRadius: '22px',
-          background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%)',
-          border: '1.5px solid rgba(56, 189, 248, 0.35)',
-          boxShadow: '0 12px 35px rgba(0, 0, 0, 0.5)',
-          color: '#ffffff',
-          textAlign: 'center'
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '0.75rem',
+          marginBottom: '1.2rem'
         }}>
-          {/* Badge Descanso */}
+          {/* Kilos */}
           <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-            padding: '0.3rem 0.8rem',
-            borderRadius: '999px',
-            background: 'rgba(56, 189, 248, 0.15)',
-            border: '1px solid #38bdf8',
-            color: '#38bdf8',
-            fontSize: '0.74rem',
-            fontWeight: 800,
-            marginBottom: '0.8rem'
-          }}>
-            <span>🧘‍♂️</span>
-            <span>DESCANSO ACTIVO · SERIE {currentSetNum} DE {targetSets}</span>
-          </div>
-
-          <div style={{ fontSize: '2.5rem', margin: '0.2rem 0' }}>
-            {partner === 'Sandra' ? '🧘‍♀️' : '🏋️‍♂️'}
-          </div>
-
-          <h3 style={{ margin: '0 0 0.3rem 0', fontSize: '1.2rem', fontWeight: 900 }}>
-            {partner} está haciendo su serie...
-          </h3>
-          <p style={{ margin: '0 0 1rem 0', fontSize: '0.82rem', color: '#94a3b8' }}>
-            Respira profundo y recupera. En su móvil tiene la ficha activa.
-          </p>
-
-          {/* Cronómetro de descanso */}
-          <div style={{
-            display: 'inline-block',
-            padding: '0.5rem 1.4rem',
+            background: '#ffffff',
+            border: `1.5px solid ${isTurnIsmael ? '#bfdbfe' : '#ddd6fe'}`,
             borderRadius: '16px',
-            background: 'rgba(0, 0, 0, 0.35)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            marginBottom: '1.2rem'
+            padding: '0.85rem 0.5rem',
+            textAlign: 'center',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
           }}>
-            <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700 }}>TIEMPO DE DESCANSO</div>
-            <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#34d399', fontFamily: 'monospace' }}>
-              {Math.floor(restSeconds / 60)}:{String(restSeconds % 60).padStart(2, '0')}
+            <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 800, letterSpacing: '0.04em' }}>
+              PESO ({currentTurnUserName.toUpperCase()})
+            </div>
+            <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0f172a', margin: '0.2rem 0' }}>
+              {effectiveWeight} <span style={{ fontSize: '0.9rem', color: '#64748b' }}>kg</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
+              <button
+                type="button"
+                onClick={() => setUserWeights(prev => ({
+                  ...prev,
+                  [`${currentExIdx}_${currentTurnUserName}`]: Math.max(0, effectiveWeight - 2.5)
+                }))}
+                style={{ width: '34px', height: '34px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#0f172a', fontSize: '1.2rem', fontWeight: 900, cursor: 'pointer' }}
+              >
+                -
+              </button>
+              <button
+                type="button"
+                onClick={() => setUserWeights(prev => ({
+                  ...prev,
+                  [`${currentExIdx}_${currentTurnUserName}`]: effectiveWeight + 2.5
+                }))}
+                style={{ width: '34px', height: '34px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#0f172a', fontSize: '1.2rem', fontWeight: 900, cursor: 'pointer' }}
+              >
+                +
+              </button>
             </div>
           </div>
 
-          {/* Próximo peso del usuario en descanso */}
+          {/* Repeticiones */}
           <div style={{
-            padding: '0.75rem',
-            borderRadius: '12px',
-            background: 'rgba(255, 255, 255, 0.03)',
-            marginBottom: '1.2rem',
-            fontSize: '0.8rem',
-            color: '#cbd5e1'
+            background: '#ffffff',
+            border: `1.5px solid ${isTurnIsmael ? '#bfdbfe' : '#ddd6fe'}`,
+            borderRadius: '16px',
+            padding: '0.85rem 0.5rem',
+            textAlign: 'center',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
           }}>
-            En cuanto {partner} termine, te tocará: <strong style={{ color: '#38bdf8' }}>{myConfig.weightKg} kg × {myConfig.reps} reps</strong>
-          </div>
-
-          {/* Panel de ánimos interactivos */}
-          <div style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: 800, marginBottom: '0.55rem' }}>
-            MÁNDALE ÁNIMOS A {partner.toUpperCase()}:
-          </div>
-
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: '0.45rem'
-          }}>
-            {[
-              { type: 'fistbump', icon: '👊', text: `¡Choca esos 5, ${partner}!` },
-              { type: 'fire', icon: '🔥', text: `¡A tope ${partner}, tú puedes!` },
-              { type: 'strong', icon: '💪', text: `¡Fuerza pura ${partner}!` },
-              { type: 'water', icon: '💧', text: `¡Bebe un sorbo de agua!` }
-            ].map((c) => (
+            <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 800, letterSpacing: '0.04em' }}>
+              REPETICIONES
+            </div>
+            <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0f172a', margin: '0.2rem 0' }}>
+              {effectiveReps} <span style={{ fontSize: '0.9rem', color: '#64748b' }}>reps</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
               <button
-                key={c.type}
                 type="button"
-                onClick={() => handleSendCheer(c.type, c.text)}
+                onClick={() => setUserReps(prev => ({
+                  ...prev,
+                  [`${currentExIdx}_${currentTurnUserName}`]: Math.max(1, (parseInt(effectiveReps) || 10) - 1)
+                }))}
+                style={{ width: '34px', height: '34px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#0f172a', fontSize: '1.2rem', fontWeight: 900, cursor: 'pointer' }}
+              >
+                -
+              </button>
+              <button
+                type="button"
+                onClick={() => setUserReps(prev => ({
+                  ...prev,
+                  [`${currentExIdx}_${currentTurnUserName}`]: (parseInt(effectiveReps) || 10) + 1
+                }))}
+                style={{ width: '34px', height: '34px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#0f172a', fontSize: '1.2rem', fontWeight: 900, cursor: 'pointer' }}
+              >
+                +
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* CRONÓMETRO DE DESCANSO CON SONIDO Y VIBRACIÓN */}
+        <div style={{
+          background: '#ffffff',
+          border: '1px solid #e2e8f0',
+          borderRadius: '16px',
+          padding: '0.75rem 0.9rem',
+          marginBottom: '1.3rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.6rem',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+        }}>
+          <div>
+            <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800 }}>CRONÓMETRO DE DESCANSO</div>
+            <div style={{ fontSize: '1.35rem', fontWeight: 900, fontFamily: 'monospace', color: restSeconds > 0 ? '#059669' : '#0f172a' }}>
+              ⏱️ {Math.floor(restSeconds / 60)}:{String(restSeconds % 60).padStart(2, '0')}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.35rem' }}>
+            {[30, 60, 90].map(sec => (
+              <button
+                key={sec}
+                type="button"
+                onClick={() => startRestTimer(sec)}
                 style={{
-                  padding: '0.65rem 0.3rem',
-                  borderRadius: '12px',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  color: '#ffffff',
-                  fontSize: '1.3rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '0.2rem'
+                  padding: '0.4rem 0.6rem',
+                  borderRadius: '10px',
+                  border: restSeconds === sec && restRunning ? '1.5px solid #059669' : '1px solid #e2e8f0',
+                  background: restSeconds === sec && restRunning ? '#ecfdf5' : '#f8fafc',
+                  color: restSeconds === sec && restRunning ? '#059669' : '#334155',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  cursor: 'pointer'
                 }}
               >
-                <span>{c.icon}</span>
+                {sec}s
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* BOTÓN PRINCIPAL DE SERIE COMPLETADA */}
+        <button
+          type="button"
+          onClick={handleCompleteSetSingleDevice}
+          style={{
+            width: '100%',
+            padding: '1.05rem',
+            borderRadius: '18px',
+            border: 'none',
+            background: isTurnIsmael
+              ? 'linear-gradient(135deg, #005B99 0%, #004b87 100%)'
+              : 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+            color: '#ffffff',
+            fontWeight: 900,
+            fontSize: '1.05rem',
+            cursor: 'pointer',
+            boxShadow: isTurnIsmael
+              ? '0 8px 24px rgba(0, 91, 153, 0.3)'
+              : '0 8px 24px rgba(124, 58, 237, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem',
+            transition: 'transform 0.1s ease'
+          }}
+        >
+          <span>✅</span>
+          <span>¡Serie Hecha! Pasar a {nextTurnUserName} ➔</span>
+        </button>
+      </div>
+
+      {/* MODAL DE SOBRECARGA PROGRESIVA AL FINAL DE CADA EJERCICIO */}
+      {showFeedbackModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 10000,
+          background: 'rgba(5, 10, 20, 0.88)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1.2rem'
+        }}>
+          <div style={{
+            maxWidth: '430px',
+            width: '100%',
+            background: '#ffffff',
+            borderRadius: '24px',
+            padding: '1.6rem',
+            color: '#0f172a',
+            textAlign: 'center',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.5)'
+          }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: '0.3rem' }}>📈</div>
+            <h3 style={{ margin: '0 0 0.25rem 0', fontSize: '1.25rem', fontWeight: 900 }}>
+              ¿Qué tal fue {currentEx?.name}?
+            </h3>
+            <p style={{ margin: '0 0 1.3rem 0', fontSize: '0.82rem', color: '#64748b' }}>
+              Ayuda a Adán a calibrar los pesos de la próxima sesión para {activeUser} y {effectivePartner}:
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              <button
+                type="button"
+                onClick={() => handleDecisionSubmit('subir')}
+                style={{
+                  padding: '0.85rem',
+                  borderRadius: '14px',
+                  border: '2px solid #10b981',
+                  background: '#ecfdf5',
+                  color: '#065f46',
+                  fontWeight: 900,
+                  fontSize: '0.92rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                <span>🟢</span>
+                <span>Subir peso (+2.5 kg próxima vez - me resultó fácil)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleDecisionSubmit('mantener')}
+                style={{
+                  padding: '0.85rem',
+                  borderRadius: '14px',
+                  border: '2px solid #3b82f6',
+                  background: '#eff6ff',
+                  color: '#1e40af',
+                  fontWeight: 900,
+                  fontSize: '0.92rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                <span>🟡</span>
+                <span>Mantener peso (ideal para consolidar técnica)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleDecisionSubmit('bajar')}
+                style={{
+                  padding: '0.85rem',
+                  borderRadius: '14px',
+                  border: '2px solid #f97316',
+                  background: '#fff7ed',
+                  color: '#c2410c',
+                  fontWeight: 900,
+                  fontSize: '0.92rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                <span>🔴</span>
+                <span>Bajar peso (demasiado duro / fallamos reps)</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
